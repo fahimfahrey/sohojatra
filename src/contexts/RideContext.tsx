@@ -14,7 +14,8 @@ interface RideContextType {
     startingPoint: Location,
     destination: Location,
     totalSeats: number,
-    contactPhone: string
+    contactPhone: string,
+    vehicle: VehicleType
   ) => Promise<RideRequest>;
   joinRideRequest: (rideId: string, contactPhone: string) => Promise<void>;
   cancelRideRequest: (rideId: string) => Promise<void>;
@@ -198,11 +199,12 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
       user && (ride.creator === user.id || ride.passengers.includes(user.id))
   );
 
-  const createRideRequest = async (
+const createRideRequest = async (
     startingPoint: Location,
     destination: Location,
     totalSeats: number,
-    contactPhone: string
+    contactPhone: string,
+    vehicle: VehicleType
   ): Promise<RideRequest> => {
     if (!user) throw new Error("User must be logged in");
 
@@ -216,6 +218,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           destination: destination,
           seats_available: totalSeats - 1, // Creator takes one seat
           total_seats: totalSeats,
+          vehicle: vehicle,
           status: "open",
           contact_phone: contactPhone,
         })
@@ -255,6 +258,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
         totalSeats,
         passengers: [user.id],
         status: "open",
+        vehicle: vehicle,
         createdAt: rideData.created_at,
         contactPhone: contactPhone,
       };

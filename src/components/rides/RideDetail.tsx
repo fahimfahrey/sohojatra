@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { RideRequest } from "../../types";
-import { MapPin, Navigation, Users, Calendar, User, Phone, Clock, CheckCircle } from "lucide-react";
+import { MapPin, Car, Navigation, Users, Calendar, User, Phone, Clock, CheckCircle } from "lucide-react";
 import RideMap from "../map/RideMap";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRide } from "../../contexts/RideContext";
@@ -20,6 +20,18 @@ interface PassengerInfo {
   isCreator: boolean;
   contactPhone?: string;
 }
+
+ const getVehicleIcon = (vehicle: string) => {
+    const icons: { [key: string]: string } = {
+      "Rickshaw": "🚲",
+      "CNG": "🛺", 
+      "Bike": "🏍️",
+      "Bus": "🚌",
+      "Car": "🚗",
+      "Uber/Pathao": "📱"
+    };
+    return icons[vehicle] || "🚗";
+  };
 
 const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
   const { user } = useAuth();
@@ -332,6 +344,35 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
               </div>
             </div>
           </div>
+
+
+          {/* Vehicle Information */}
+          {ride.vehicle && (
+            <div className="mb-6 sm:mb-8 bg-purple-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-purple-200">
+              <h3 className="text-lg sm:text-xl font-bold text-purple-800 mb-3 sm:mb-4 flex items-center">
+                <Car className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3" />
+                Vehicle Information
+              </h3>
+              <div className="bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 border border-purple-200">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 rounded-full flex items-center justify-center">
+                    <span className="text-2xl sm:text-3xl">{getVehicleIcon(ride.vehicle)}</span>
+                  </div>
+                  <div>
+                    <p className="text-lg sm:text-xl font-bold text-gray-900">{ride.vehicle}</p>
+                    <p className="text-sm sm:text-base text-gray-600">
+                      {ride.vehicle === "Rickshaw" && "Traditional cycle rickshaw - eco-friendly and affordable"}
+                      {ride.vehicle === "CNG" && "3-wheeler auto-rickshaw - fast and economical"}
+                      {ride.vehicle === "Bike" && "Motorcycle ride - quick for short distances"}
+                      {ride.vehicle === "Bus" && "Public bus - cheapest for longer routes"}
+                      {ride.vehicle === "Car" && "Private car - comfortable and air-conditioned"}
+                      {ride.vehicle === "Uber/Pathao" && "App-based ride sharing - convenient and trackable"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Contact Information */}
           {(isPassenger || isCreator) && passengers.length > 0 && (

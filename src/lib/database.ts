@@ -5,28 +5,74 @@ import {
   isMobileDevice,
   isNotificationSupported,
 } from "./browserNotifications";
+import { VehicleType } from "../types";
 
-// Rides related functions
 export const fetchAllRides = async () => {
-  const { data, error } = await supabase.from("ride_requests").select(`
-      id,
-      creator_id,
-      starting_point,
-      destination,
-      seats_available,
-      total_seats,
-      status,
-      created_at,
-      updated_at
-    `);
+  try {
+    const { data, error } = await supabase
+      .from("ride_requests")
+      .select(`
+        id,
+        creator_id,
+        starting_point,
+        destination,
+        seats_available,
+        total_seats,
+        status,
+        vehicle,
+        contact_phone,
+        created_at,
+        updated_at
+      `)
+      .order("created_at", { ascending: false });
 
-  if (error) {
+    if (error) throw error;
+
+
+    const transformedData = await Promise.all(
+      (data || []).map(async (ride) => {
+        const passengers = await fetchRidePassengers(ride.id);
+        return {
+          id: ride.id,
+          creator: ride.creator_id,
+          starting_point: ride.starting_point,
+          destination: ride.destination,
+          seats_available: ride.seats_available,
+          total_seats: ride.total_seats,
+          status: ride.status,
+          vehicle: ride.vehicle, 
+          contact_phone: ride.contact_phone,
+          created_at: ride.created_at,
+          updated_at: ride.updated_at,
+          passengers
+        };
+      })
+    );
+
+    return transformedData;
+  } catch (error) {
     console.error("Error fetching rides:", error);
     throw error;
   }
-
-  return data;
 };
+
+export const fetchRidesByVehicle = async (vehicleType: VehicleType) => {
+  try {
+    const { data, error } = await supabase
+      .from("ride_requests")
+      .select("*")
+      .eq("vehicle", vehicleType)
+      .eq("status", "open")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching rides by vehicle:", error);
+    throw error;
+  }
+};
+
 
 export const fetchRideById = async (rideId: string) => {
   const { data, error } = await supabase
@@ -88,7 +134,8 @@ export const createRide = async (
   startingPoint: Location,
   destination: Location,
   totalSeats: number,
-  contactPhone: string
+  contactPhone: string,
+  vehicle: VehicleType
 ) => {
   // Insert the ride
   const { data, error } = await supabase
@@ -99,6 +146,7 @@ export const createRide = async (
       destination,
       seats_available: totalSeats - 1, // Creator takes one seat
       total_seats: totalSeats,
+      vehicle: vehicle,
       status: "open",
       contact_phone: contactPhone,
     })

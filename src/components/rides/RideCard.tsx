@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { RideRequest } from "../../types";
-import { MapPin, Navigation, Users, Calendar, Clock } from "lucide-react";
+import { MapPin, Navigation, Users, Calendar, Clock, Car } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -72,6 +72,18 @@ const RideCard: React.FC<RideCardProps> = ({
     );
   };
 
+  const getVehicleIcon = (vehicle: string) => {
+    const icons: { [key: string]: string } = {
+      "Rickshaw": "🚲",
+      "CNG": "🛺",
+      "Bike": "🏍️",
+      "Bus": "🚌",
+      "Car": "🚗",
+      "Uber/Pathao": "📱"
+    };
+    return icons[vehicle] || "🚗";
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -105,6 +117,14 @@ const RideCard: React.FC<RideCardProps> = ({
             {getStatusBadge(ride.status)}
           </div>
         </div>
+
+        {/* Vehicle Type */}
+        {ride.vehicle && (
+          <div className="flex items-center space-x-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
+            <span className="text-base">{getVehicleIcon(ride.vehicle)}</span>
+            <span className="text-sm font-medium text-gray-700">{ride.vehicle}</span>
+          </div>
+        )}
       </div>
 
       {/* Content */}
