@@ -35,15 +35,20 @@ const RideList: React.FC<RideListProps> = ({
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
 
+  // Sort rides by createdAt in descending order (newest first)
+  const sortedRides = [...rides].sort((a, b) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
   // Track rides in state just for logging
   useEffect(() => {
     if (process.env.NODE_ENV === "development") {
       console.log(
         "RideList: Current ride IDs:",
-        rides.map((r) => r.id).join(", ")
+        sortedRides.map((r) => r.id).join(", ")
       );
     }
-  }, [rides]);
+  }, [sortedRides]);
 
   const handleJoinClick = async (rideId: string) => {
     // Sync ride status before joining
@@ -170,7 +175,7 @@ const RideList: React.FC<RideListProps> = ({
     }
   };
 
-  if (rides.length === 0) {
+  if (sortedRides.length === 0) {
     return (
       <div className="bg-white rounded-2xl p-8 sm:p-12 lg:p-16 text-center shadow-soft border border-gray-100">
         <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-gradient-to-br from-gray-200 to-gray-300 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6 lg:mb-8">
@@ -202,7 +207,7 @@ const RideList: React.FC<RideListProps> = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-      {rides.map((ride) => (
+      {sortedRides.map((ride) => (
         <div key={ride.id} className="w-full">
           <RideCard
             ride={ride}

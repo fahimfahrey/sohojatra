@@ -206,7 +206,13 @@ const RideCard: React.FC<RideCardProps> = ({
 
           <button
             type="button"
-            onClick={() => handleAction("view")}
+            onClick={() => {
+              handleAction("view");
+              window.scrollTo({
+                top: 0,
+                behavior: "smooth",
+              });
+            }}
             className="w-full sm:flex-1 inline-flex items-center justify-center px-3 sm:px-4 py-2.5 border-2 border-gray-200 hover:border-accent-300 hover:bg-accent-50 text-gray-700 hover:text-accent-700 text-sm font-semibold rounded-xl transition-all duration-200"
           >
             View Details

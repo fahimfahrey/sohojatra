@@ -570,10 +570,13 @@ const GlobalMap: React.FC<GlobalMapProps> = ({
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center">
           <div className="bg-white rounded-2xl p-8 shadow-2xl flex flex-col items-center space-y-4">
-            <div className="relative">
-              <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-accent-500"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-accent-100"></div>
-            </div>
+              <div className="relative">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-orange-500 opacity-30"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-8 w-8 bg-orange-500 rounded-full animate-pulse"></div>
+                </div>
+              </div>
             <div className="text-center">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Getting Location Details
