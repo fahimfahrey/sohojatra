@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useRide } from "../../contexts/RideContext";
 import { useAbly } from "../../contexts/AblyContext";
-import { Search, MapPin, Filter } from "lucide-react";
-import { Location, RideRequest } from "../../types";
+import { Search, MapPin, Filter, Car, X } from "lucide-react";
+import { Location, RideRequest, VehicleType } from "../../types";
 import GlobalMap from "../map/GlobalMap";
 import RideList from "./RideList";
+import VehicleSelector from "./VehicleSelector";
 
 const FindRideForm: React.FC = () => {
   const [startingPoint, setStartingPoint] = useState<Location | null>(null);
   const [destination, setDestination] = useState<Location | null>(null);
-  const [matchingRides, setMatchingRides] = useState<RideRequest[]>([]);
+  const [allMatchingRides, setAllMatchingRides] = useState<RideRequest[]>([]);
+  const [filteredRides, setFilteredRides] = useState<RideRequest[]>([]);
   const [searched, setSearched] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
+  const [showVehicleFilter, setShowVehicleFilter] = useState(false);
 
   const { findMatchingRides, refreshAllRides } = useRide();
   const { subscribeToEvent } = useAbly();
@@ -23,20 +27,48 @@ const FindRideForm: React.FC = () => {
       // First refresh the full database data to ensure we have the latest rides
       await refreshAllRides();
 
-      // Then run the match algorithm
-      const updatedRides = findMatchingRides(startingPoint, destination);
-      console.log(`Found ${updatedRides.length} matching rides`);
+      // Get all matching rides without vehicle filter
+      const updatedRides = findMatchingRides(startingPoint, destination, null);
+      console.log(`Found ${updatedRides.length} total matching rides`);
 
-      // Update the UI with the results
-      setMatchingRides(updatedRides);
+      // Update the all matching rides
+      setAllMatchingRides(updatedRides);
+
+      // Apply vehicle filter if selected
+      if (selectedVehicle) {
+        const vehicleFilteredRides = updatedRides.filter(
+          (ride) => ride.vehicle === selectedVehicle
+        );
+        console.log(`After vehicle filter (${selectedVehicle}): ${vehicleFilteredRides.length} rides`);
+        setFilteredRides(vehicleFilteredRides);
+      } else {
+        setFilteredRides(updatedRides);
+      }
     }
   }, [
     searched,
     startingPoint,
     destination,
+    selectedVehicle,
     findMatchingRides,
     refreshAllRides,
   ]);
+
+  // Apply vehicle filter when vehicle selection changes
+  useEffect(() => {
+    if (searched && allMatchingRides.length > 0) {
+      if (selectedVehicle) {
+        const vehicleFilteredRides = allMatchingRides.filter(
+          (ride) => ride.vehicle === selectedVehicle
+        );
+        console.log(`Vehicle filter applied (${selectedVehicle}): ${vehicleFilteredRides.length} rides`);
+        setFilteredRides(vehicleFilteredRides);
+      } else {
+        console.log("Vehicle filter cleared, showing all rides");
+        setFilteredRides(allMatchingRides);
+      }
+    }
+  }, [selectedVehicle, allMatchingRides, searched]);
 
   // Event handlers - moved outside useEffect and memoized
   const handleNewRide = useCallback(() => {
@@ -130,21 +162,65 @@ const FindRideForm: React.FC = () => {
     }
 
     setSearched(true);
+    setShowVehicleFilter(false); // Hide vehicle filter initially
+    setSelectedVehicle(null); // Clear any previous vehicle selection
 
     // First refresh the full database data to ensure we have the latest rides
     await refreshAllRides();
 
-    // Then run the match algorithm
-    const rides = findMatchingRides(startingPoint, destination);
-    setMatchingRides(rides);
-    
+
+    // Get all matching rides without vehicle filter
+    const rides = findMatchingRides(startingPoint, destination, null);
+    setAllMatchingRides(rides);
+    setFilteredRides(rides);
+
   };
 
   const clearSearch = () => {
     setStartingPoint(null);
     setDestination(null);
-    setMatchingRides([]);
+    setAllMatchingRides([]);
+    setFilteredRides([]);
     setSearched(false);
+    setSelectedVehicle(null);
+    setShowVehicleFilter(false);
+  };
+
+  const handleVehicleFilterToggle = () => {
+    if (showVehicleFilter) {
+      // Hiding vehicle filter - clear selection and show all rides
+      setSelectedVehicle(null);
+      setFilteredRides(allMatchingRides);
+    }
+    setShowVehicleFilter(!showVehicleFilter);
+  };
+
+  const handleVehicleChange = (vehicle: VehicleType) => {
+    setSelectedVehicle(vehicle);
+    // The useEffect will handle filtering
+  };
+
+  const clearVehicleFilter = () => {
+    setSelectedVehicle(null);
+    // The useEffect will handle showing all rides
+  };
+
+  const getVehicleIcon = (vehicle: string) => {
+    const icons: { [key: string]: string } = {
+      "Rickshaw": "🚲",
+      "CNG": "🛺",
+      "Bike": "🏍️",
+      "Bus": "🚌",
+      "Car": "🚗",
+      "Uber/Pathao": "📱"
+    };
+    return icons[vehicle] || "🚗";
+  };
+
+  // Get unique vehicle types from all matching rides
+  const getAvailableVehicleTypes = (): VehicleType[] => {
+    const vehicleTypes = [...new Set(allMatchingRides.map(ride => ride.vehicle).filter(Boolean))];
+    return vehicleTypes as VehicleType[];
   };
 
   return (
@@ -180,7 +256,7 @@ const FindRideForm: React.FC = () => {
                   className="w-full px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl sm:rounded-2xl hover:bg-gray-200 transition-all duration-200 flex items-center justify-center gap-2"
                 >
                   <Filter className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="text-sm sm:text-base">Clear</span>
+                  <span className="text-sm sm:text-base">Clear Search</span>
                 </button>
               </div>
             </div>
@@ -233,8 +309,14 @@ const FindRideForm: React.FC = () => {
                       Search Results:
                     </p>
                     <p className="text-sm sm:text-base text-gray-900 font-medium">
-                      {matchingRides.length} ride{matchingRides.length !== 1 ? 's' : ''} found
+                      {filteredRides.length} ride{filteredRides.length !== 1 ? 's' : ''} found
+                      {selectedVehicle ? ` (${selectedVehicle} only)` : ` (all vehicles)`}
                     </p>
+                    {allMatchingRides.length !== filteredRides.length && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {allMatchingRides.length} total rides found for this route
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -247,11 +329,11 @@ const FindRideForm: React.FC = () => {
                 <ul className="space-y-2 sm:space-y-3 text-blue-700">
                   <li className="flex items-start text-sm sm:text-base">
                     <span className="text-blue-500 mr-2 flex-shrink-0">•</span>
-                    <span>Use the search box to find locations quickly</span>
+                    <span>First search by route to see all available rides</span>
                   </li>
                   <li className="flex items-start text-sm sm:text-base">
                     <span className="text-blue-500 mr-2 flex-shrink-0">•</span>
-                    <span>Drag markers to refine exact positions</span>
+                    <span>Then use vehicle filter to narrow down your options</span>
                   </li>
                   <li className="flex items-start text-sm sm:text-base">
                     <span className="text-blue-500 mr-2 flex-shrink-0">•</span>
@@ -259,7 +341,7 @@ const FindRideForm: React.FC = () => {
                   </li>
                   <li className="flex items-start text-sm sm:text-base">
                     <span className="text-blue-500 mr-2 flex-shrink-0">•</span>
-                    <span>Our algorithm finds rides along similar routes</span>
+                    <span>Drag markers to refine exact positions</span>
                   </li>
                 </ul>
               </div>
@@ -272,29 +354,119 @@ const FindRideForm: React.FC = () => {
       {searched && (
         <div className="mt-6 sm:mt-8">
           <div className="bg-white shadow-large rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-gray-100">
-            <div className="text-center mb-6 sm:mb-8">
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
-                {matchingRides.length > 0
-                  ? `Found ${matchingRides.length} matching ride${matchingRides.length !== 1 ? 's' : ''}`
-                  : "No matching rides found"}
-              </h3>
-              {matchingRides.length > 0 ? (
+            {/* Results Header with Vehicle Filter Toggle */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
+              <div>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+                  {filteredRides.length > 0
+                    ? `Found ${filteredRides.length} matching ride${filteredRides.length !== 1 ? 's' : ''}`
+                    : "No matching rides found"}
+                </h3>
                 <p className="text-sm sm:text-base text-gray-600">
-                  Here are the rides that match your route
+                  {filteredRides.length > 0 ? (
+                    <>Here are the rides that match your route{selectedVehicle && ` with ${selectedVehicle}`}</>
+                  ) : (
+                    <>Try adjusting your route{selectedVehicle && ', changing vehicle filter,'} or create a new ride request</>
+                  )}
                 </p>
-              ) : (
-                <p className="text-sm sm:text-base text-gray-600">
-                  Try adjusting your route or create a new ride request
-                </p>
+              </div>
+
+              {/* Vehicle Filter Button - Only show if there are rides */}
+              {allMatchingRides.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleVehicleFilterToggle}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      showVehicleFilter
+                        ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Car className="w-4 h-4" />
+                    <span className="text-sm">
+                      {showVehicleFilter ? 'Hide' : 'Filter by'} Vehicle
+                    </span>
+                    {showVehicleFilter && <X className="w-4 h-4" />}
+                  </button>
+                </div>
               )}
             </div>
 
+            {/* Vehicle Filter Section */}
+            {showVehicleFilter && allMatchingRides.length > 0 && (
+              <div className="mb-6 sm:mb-8 bg-blue-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-base sm:text-lg font-semibold text-blue-800">
+                    Filter by Vehicle Type
+                  </h4>
+                  {selectedVehicle && (
+                    <button
+                      onClick={clearVehicleFilter}
+                      className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Clear Filter
+                    </button>
+                  )}
+                </div>
+
+                {/* Available Vehicle Types */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {getAvailableVehicleTypes().map((vehicleType) => {
+                    const rideCount = allMatchingRides.filter(ride => ride.vehicle === vehicleType).length;
+                    return (
+                      <button
+                        key={vehicleType}
+                        onClick={() => handleVehicleChange(vehicleType)}
+                        className={`p-3 rounded-lg border-2 transition-all duration-200 ${
+                          selectedVehicle === vehicleType
+                            ? 'border-blue-500 bg-blue-100 text-blue-800'
+                            : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                        }`}
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-lg">{getVehicleIcon(vehicleType)}</span>
+                          <span className="text-xs font-medium">{vehicleType}</span>
+                          <span className="text-xs text-gray-500">
+                            {rideCount} ride{rideCount !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Current Filter Status */}
+                {selectedVehicle && (
+                  <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700">Filtering by:</span>
+                        <div className="flex items-center gap-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                          <span>{getVehicleIcon(selectedVehicle)}</span>
+                          <span>{selectedVehicle}</span>
+                        </div>
+                      </div>
+                      <span className="text-sm text-gray-600">
+                        {filteredRides.length} of {allMatchingRides.length} rides
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Ride List */}
             <RideList
-              rides={matchingRides}
-              emptyMessage="No rides match your route. Would you like to create a new ride request?"
+              rides={filteredRides}
+              emptyMessage={
+                selectedVehicle 
+                  ? `No rides found with ${selectedVehicle} for this route. Try selecting a different vehicle type or clear the filter.`
+                  : `No rides match your route. Would you like to create a new ride request?`
+              }
             />
 
-            {matchingRides.length === 0 && (
+            {/* Create New Ride CTA */}
+            {filteredRides.length === 0 && (
               <div className="mt-6 sm:mt-8 text-center">
                 <a
                   href="/create-ride"

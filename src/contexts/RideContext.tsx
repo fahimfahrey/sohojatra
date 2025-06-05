@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { RideRequest, Location, RideStatus } from "../types";
+import { RideRequest, Location, VehicleType, RideStatus } from "../types";
 import { useAuth } from "./AuthContext";
 import { useAbly } from "./AblyContext";
 import { supabase } from "../lib/supabase";
-import { notifyAllRidePassengers } from "../lib/notifications";
-import { updateRideStatus } from "../lib/database";
+
 
 interface RideContextType {
   rides: RideRequest[];
@@ -22,7 +21,8 @@ interface RideContextType {
   completeRideRequest: (rideId: string) => Promise<void>;
   findMatchingRides: (
     startPoint: Location,
-    endPoint: Location
+    endPoint: Location,
+    vehicleFilter?: VehicleType | null
   ) => RideRequest[];
   syncRideStatus: (rideId: string) => Promise<void>;
   refreshAllRides: () => Promise<void>;
@@ -51,7 +51,9 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           seats_available,
           total_seats,
           status,
-          created_at
+          created_at,
+          vehicle,
+          contact_phone
         `);
 
       if (error) {
@@ -71,8 +73,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
               .eq("ride_id", ride.id);
 
             if (passengersError) {
-              console.error("Error fetching passengers:", passengersError);
-              return null;
+              console.error("Error fetching passengers for ride:", ride.id, passengersError);
             }
 
             const passengerIds = passengers
@@ -89,6 +90,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
               passengers: passengerIds,
               status: ride.status as RideStatus,
               createdAt: ride.created_at,
+              vehicle: ride.vehicle as VehicleType,
+              contactPhone: ride.contact_phone,
             };
           })
         );
@@ -145,9 +148,20 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
                 }
 
                 if (data) {
-                  console.log("Updated ride data from DB:", data);
-                  // Force a full refetch to ensure everything is in sync
-                  fetchRides();
+                  console.log("Updated ride data received:", data);
+                  // Update the specific ride in our state
+                  setRides((prevRides) =>
+                    prevRides.map((ride) =>
+                      ride.id === data.id
+                        ? {
+                            ...ride,
+                            status: data.status,
+                            seatsAvailable: data.seats_available,
+                            vehicle: data.vehicle,
+                          }
+                        : ride
+                    )
+                  );
                 }
               });
           } else {
@@ -199,7 +213,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
       user && (ride.creator === user.id || ride.passengers.includes(user.id))
   );
 
-const createRideRequest = async (
+  const createRideRequest = async (
     startingPoint: Location,
     destination: Location,
     totalSeats: number,
@@ -357,6 +371,7 @@ const createRideRequest = async (
         seats_available: newSeatsAvailable,
         total_seats: ride.totalSeats,
         status: newStatus,
+        vehicle: ride.vehicle,
       });
 
       if (rideError) {
@@ -491,18 +506,14 @@ const createRideRequest = async (
 
         if (passengerError) {
           console.error("Error removing passenger:", passengerError);
-          throw new Error(passengerError.message);
         }
 
         // Only update ride status if it's not already completed or cancelled
         if (ride.status !== "completed" && ride.status !== "cancelled") {
-          console.log(
-            `Updating ride status for active ride, setting seats_available to ${
-              ride.seatsAvailable + 1
-            }`
-          );
+          const newSeatsAvailable = ride.seatsAvailable + 1;
+          const newStatus = "open";
+          const newPassengers = ride.passengers.filter((p) => p !== user.id);
 
-          // Update ride available seats
           const { error: rideError } = await supabase
             .from("ride_requests")
             .upsert({
@@ -510,50 +521,47 @@ const createRideRequest = async (
               creator_id: ride.creator,
               starting_point: ride.startingPoint,
               destination: ride.destination,
-              seats_available: ride.seatsAvailable + 1,
+              seats_available: newSeatsAvailable,
               total_seats: ride.totalSeats,
-              status: "open",
+              status: newStatus,
+              vehicle: ride.vehicle,
             });
 
           if (rideError) {
-            console.error("Error updating ride:", rideError);
-            throw new Error(rideError.message);
+            console.error("Error updating ride after passenger left:", rideError);
           }
 
           // Update local state
           const updatedRide = {
             ...ride,
-            seatsAvailable: ride.seatsAvailable + 1,
-            status: "open" as RideStatus,
-            passengers: ride.passengers.filter((id) => id !== user.id),
+            seatsAvailable: newSeatsAvailable,
+            status: newStatus as RideStatus,
+            passengers: newPassengers,
           };
 
           setRides((prevRides) =>
             prevRides.map((r) => (r.id === rideId ? updatedRide : r))
           );
 
-          // Emit Ably event
+          // Emit Ably events
           publishEvent("rides", "update", updatedRide);
-
-          // If user was a passenger and not the creator, emit leave event
-          if (ride.creator !== user.id && ride.passengers.includes(user.id)) {
-            publishEvent("rides", "leave", updatedRide);
-          }
+          publishEvent("rides", "leave", updatedRide);
         } else {
-          console.log(`NOT updating ride status for ${ride.status} ride`);
-
-          // If ride was already completed or cancelled, just remove the passenger without changing status
-          // Update local state
+          console.log(
+            `Ride ${rideId} has status ${ride.status}, not updating seat availability`
+          );
+          
+          // Just remove the passenger from local state without changing seat availability
+          const newPassengers = ride.passengers.filter((p) => p !== user.id);
           const updatedRide = {
             ...ride,
-            passengers: ride.passengers.filter((id) => id !== user.id),
+            passengers: newPassengers,
           };
 
           setRides((prevRides) =>
             prevRides.map((r) => (r.id === rideId ? updatedRide : r))
           );
 
-          // Still emit a leave event so the UI can update
           publishEvent("rides", "leave", updatedRide);
         }
       }
@@ -629,15 +637,28 @@ const createRideRequest = async (
 
   const findMatchingRides = (
     startPoint: Location,
-    endPoint: Location
+    endPoint: Location,
+    vehicleFilter?: VehicleType | null
   ): RideRequest[] => {
+    console.log("Finding matching rides with vehicle filter:", vehicleFilter);
+    
     // Find rides where both starting point and destination are within 1km of the given points
-    return rides.filter(
+    let matchingRides = rides.filter(
       (ride) =>
         ride.status === "open" &&
         calculateDistance(ride.startingPoint, startPoint) <= 0.01 && // Approx 1km in latitude/longitude
         calculateDistance(ride.destination, endPoint) <= 0.01
     );
+
+    // Apply vehicle filter if specified
+    if (vehicleFilter) {
+      matchingRides = matchingRides.filter(
+        (ride) => ride.vehicle === vehicleFilter
+      );
+      console.log(`Filtered by vehicle ${vehicleFilter}, found ${matchingRides.length} rides`);
+    }
+
+    return matchingRides;
   };
 
   const syncRideStatus = async (rideId: string) => {
@@ -646,7 +667,7 @@ const createRideRequest = async (
       // Get the ride status directly from the database
       const { data, error } = await supabase
         .from("ride_requests")
-        .select("status, seats_available")
+        .select("status, seats_available, vehicle")
         .eq("id", rideId)
         .single();
 
@@ -661,7 +682,7 @@ const createRideRequest = async (
       }
 
       console.log(
-        `Database status for ride ${rideId}: ${data.status}, seats: ${data.seats_available}`
+        `Database status for ride ${rideId}: ${data.status}, seats: ${data.seats_available}, vehicle: ${data.vehicle}`
       );
 
       // Find the ride in local state
@@ -674,7 +695,8 @@ const createRideRequest = async (
       // Check if status needs to be updated
       if (
         localRide.status !== data.status ||
-        localRide.seatsAvailable !== data.seats_available
+        localRide.seatsAvailable !== data.seats_available ||
+        localRide.vehicle !== data.vehicle
       ) {
         console.log(
           `Updating local ride ${rideId} status from ${localRide.status} to ${data.status}`
@@ -685,6 +707,7 @@ const createRideRequest = async (
           ...localRide,
           status: data.status as RideStatus,
           seatsAvailable: data.seats_available,
+          vehicle: data.vehicle as VehicleType,
         };
 
         setRides((prevRides) =>

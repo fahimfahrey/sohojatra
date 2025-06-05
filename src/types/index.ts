@@ -32,41 +32,40 @@ export type RideRequest = {
   contactPhone?: string;
 };
 
-export const VEHICLE_OPTIONS: Array<{
+export interface VehicleOption {
   value: VehicleType;
   label: string;
-  description: string;
   icon: string;
-}> = [
+  description: string;
+}
+
+export const VEHICLE_OPTIONS: VehicleOption[] = [
   {
     value: "Rickshaw",
     label: "Rickshaw",
-    description: "Traditional rickshaw",
     icon: "🚲",
-
+    description: "Traditional cycle rickshaw - eco-friendly and affordable for short distances",
   },
   {
     value: "CNG",
-    label: "CNG",
-    description: "3-wheeler auto-rickshaw",
+    label: "CNG Auto-rickshaw",
     icon: "🛺",
-
-  },
+    description: "3-wheeler auto-rickshaw - fast and economical for medium distances",
+    },
   {
     value: "Bike",
-    label: "Motorbike",
-    description: "Quick for short distances",
+    label: "Motorcycle",
     icon: "🏍️",
-
+    description: "Motorcycle ride - quick for short to medium distances",
   },
   {
     value: "Uber/Pathao",
-    label: "Ride-sharing",
-    description: "App-based ride sharing - convenient and trackable",
+    label: "Ride Sharing",
+    description: "Book a ride via Uber or Pathao app - convenient for all distances",
     icon: "📱",
-
   }
 ];
+
 
 export type Notification = {
   id: string;
