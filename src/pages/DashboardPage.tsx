@@ -12,7 +12,7 @@ import { RideRequest } from "../types";
 
 const DashboardPage: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
-  const { userRides, rides, fetchRides, loading } = useRide();
+  const { userRides, rides, refreshAllRides, loading } = useRide();
   const { subscribeToEvent } = useAbly();
   const navigate = useNavigate();
   const [tokenUser, setTokenUser] = useState<{
@@ -43,8 +43,8 @@ const DashboardPage: React.FC = () => {
     const activeUser = user || tokenUser;
     if (!activeUser) return;
 
-    const handleRideUpdate = (message: { data: RideRequest }) => {
-      const updatedRide = message.data;
+    const handleRideUpdate = (message: { data: Record<string, unknown> }) => {
+      const updatedRide = message.data as RideRequest;
       console.log(
         "Dashboard received ride update:",
         updatedRide.status,
@@ -90,8 +90,8 @@ const DashboardPage: React.FC = () => {
       }
     };
 
-    const handleNewRide = (message: { data: RideRequest }) => {
-      const newRide = message.data;
+    const handleNewRide = (message: { data: Record<string, unknown> }) => {
+      const newRide = message.data as RideRequest;
 
       // Add to rides list if it's not already there
       setDashboardRides((prevRides) => {
@@ -273,7 +273,7 @@ const DashboardPage: React.FC = () => {
                   </p>
                   <p className="text-xl sm:text-2xl font-bold text-gray-900">
                     {dashboardUserRides.filter(
-                      (ride) => ride.creator !== user?.id && ride.passengers.includes(user?.id)
+                      (ride) => displayUser && ride.creator !== displayUser.id && ride.passengers.includes(displayUser.id)
                     ).length}
                   </p>
                 </div>
@@ -307,7 +307,7 @@ const DashboardPage: React.FC = () => {
                   </p>
                   <p className="text-xl sm:text-2xl font-bold text-gray-900">
                     {userRides.length + dashboardUserRides.filter(
-                      (ride) => ride.creator !== user?.id && ride.passengers.includes(user?.id)
+                      (ride) => displayUser && ride.creator !== displayUser.id && ride.passengers.includes(displayUser.id)
                     ).length}
                   </p>
                 </div>
@@ -375,11 +375,11 @@ const DashboardPage: React.FC = () => {
             </div>
             
             {dashboardUserRides.filter(
-              (ride) => ride.creator !== user?.id && ride.passengers.includes(user?.id)
+              (ride) => displayUser && ride.creator !== displayUser.id && ride.passengers.includes(displayUser.id)
             ).length > 0 ? (
               <RideList
                 rides={dashboardUserRides.filter(
-                  (ride) => ride.creator !== user?.id && ride.passengers.includes(user?.id)
+                  (ride) => displayUser && ride.creator !== displayUser.id && ride.passengers.includes(displayUser.id)
                 )}
                 showActions={true}
                 emptyMessage="You haven't joined any rides yet."

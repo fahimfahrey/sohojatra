@@ -49,29 +49,43 @@ export const AblyProvider: React.FC<{ children: ReactNode }> = ({
 
     const setupAbly = () => {
       // Only initialize Ably if the user is logged in
-      if (user) {
+      if (user && ABLY_API_KEY) {
         try {
           // Create Ably instance with client ID for authentication
           ablyInstance = new Ably.Realtime({
             key: ABLY_API_KEY,
             clientId: user.id,
             autoConnect: true,
+            disconnectedRetryTimeout: 5000, // Retry connection after 5 seconds
+            suspendedRetryTimeout: 10000, // Retry if suspended after 10 seconds
           });
 
           // Set up connection state change listener
           ablyInstance.connection.on("connected", () => {
             setConnected(true);
+            console.log("Successfully connected to Ably real-time service");
             toast.success("Connected to real-time updates");
           });
 
           ablyInstance.connection.on("disconnected", () => {
             setConnected(false);
+            console.warn("Disconnected from Ably real-time service");
             toast.error("Disconnected from real-time updates");
           });
 
-          ablyInstance.connection.on("failed", () => {
+          ablyInstance.connection.on("failed", (stateChange) => {
             setConnected(false);
+            console.error("Failed to connect to Ably:", stateChange.reason);
             toast.error("Failed to connect to real-time updates");
+          });
+
+          ablyInstance.connection.on("suspended", () => {
+            setConnected(false);
+            console.warn("Ably connection suspended");
+          });
+
+          ablyInstance.connection.on("connecting", () => {
+            console.log("Connecting to Ably real-time service...");
           });
 
           setAbly(ablyInstance);
@@ -79,6 +93,9 @@ export const AblyProvider: React.FC<{ children: ReactNode }> = ({
           console.error("Error initializing Ably:", error);
           toast.error("Failed to initialize real-time connection");
         }
+      } else if (!ABLY_API_KEY) {
+        console.error("Ably API key not configured");
+        toast.error("Real-time service not configured");
       }
     };
 

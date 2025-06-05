@@ -26,8 +26,8 @@ const RideDetailPage: React.FC = () => {
   useEffect(() => {
     if (!id) return;
 
-    const handleRideUpdate = (message: { data: RideRequest }) => {
-      const updatedRide = message.data;
+    const handleRideUpdate = (message: { data: Record<string, unknown> }) => {
+      const updatedRide = message.data as RideRequest;
       if (updatedRide.id === id) {
         setCurrentRide(updatedRide);
       }

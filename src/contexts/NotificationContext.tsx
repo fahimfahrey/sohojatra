@@ -145,7 +145,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (!user) return;
 
-    const handleRideUpdate = (message: Ably.Types.Message) => {
+    const handleRideUpdate = (message: { data: Record<string, unknown> }) => {
       const data = message.data as RideRequest;
       console.log("Received ride update event:", data.status, data);
 
@@ -170,7 +170,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
 
-    const handleRideJoin = (message: Ably.Types.Message) => {
+    const handleRideJoin = (message: { data: Record<string, unknown> }) => {
       const data = message.data as RideRequest;
       // If the user is the creator, notify them when someone joins
       if (data.creator === user.id) {
@@ -179,7 +179,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
 
-    const handleRideLeave = (message: Ably.Types.Message) => {
+    const handleRideLeave = (message: { data: Record<string, unknown> }) => {
       const data = message.data as RideRequest;
       // If the user is the creator, notify them when someone leaves
       if (data.creator === user.id) {

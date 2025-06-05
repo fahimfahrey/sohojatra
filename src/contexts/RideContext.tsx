@@ -3,6 +3,8 @@ import { RideRequest, Location, VehicleType, RideStatus } from "../types";
 import { useAuth } from "./AuthContext";
 import { useAbly } from "./AblyContext";
 import { supabase } from "../lib/supabase";
+import { updateRideStatus } from "../lib/database";
+import { notifyAllRidePassengers } from "../lib/notifications";
 
 
 interface RideContextType {
@@ -205,7 +207,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
       supabase.removeChannel(passengerSubscription);
       if (unsubscribeSync) unsubscribeSync();
     };
-  }, [user]); // Only depend on user, not on useAbly
+  }, [user, subscribeToEvent]); // Include subscribeToEvent in dependencies
 
   // Filter rides that the current user is part of
   const userRides = rides.filter(
