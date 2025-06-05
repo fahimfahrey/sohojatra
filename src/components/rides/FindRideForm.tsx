@@ -121,6 +121,10 @@ const FindRideForm: React.FC = () => {
   }, [searched, startingPoint, destination, refreshMatchingRides]);
 
   const handleSearch = async () => {
+    window.scrollTo({
+      top: screen.height + 800,
+      behavior: "smooth",
+    });
     if (!startingPoint || !destination) {
       return;
     }
@@ -133,6 +137,7 @@ const FindRideForm: React.FC = () => {
     // Then run the match algorithm
     const rides = findMatchingRides(startingPoint, destination);
     setMatchingRides(rides);
+    
   };
 
   const clearSearch = () => {
