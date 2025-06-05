@@ -105,12 +105,24 @@ const Header: React.FC = () => {
                   <Link
                     to="/login"
                     className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 hover:text-accent-600 hover:bg-accent-50 transition-all duration-200"
+                    onClick={() => {
+                      window.scrollTo({
+                        top: 0,
+                        behavior: "smooth",
+                      });
+                    }}
                   >
                     Log in
                   </Link>
                   <Link
                     to="/register"
                     className="px-4 py-2 bg-gradient-to-r from-accent-400 to-accent-500 hover:from-accent-500 hover:to-accent-600 text-white text-sm font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-medium"
+                    onClick={() => {
+                      window.scrollTo({
+                        top: 0,
+                        behavior: "smooth",
+                      });
+                    }}
                   >
                     Sign up
                   </Link>
@@ -200,14 +212,26 @@ const Header: React.FC = () => {
                   <Link
                     to="/login"
                     className="block px-4 py-3 text-base font-medium text-gray-700 hover:text-accent-600 hover:bg-accent-50 rounded-xl transition-all duration-200"
-                    onClick={() => setIsMenuOpen(false)}
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      window.scrollTo({
+                        top: 0,
+                        behavior: "smooth",
+                      });
+                    }}
                   >
                     Log in
                   </Link>
                   <Link
                     to="/register"
                     className="block px-4 py-3 text-base font-medium text-white bg-gradient-to-r from-accent-400 to-accent-500 hover:from-accent-500 hover:to-accent-600 rounded-xl transition-all duration-200 mt-2"
-                    onClick={() => setIsMenuOpen(false)}
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      window.scrollTo({
+                        top: 0,
+                        behavior: "smooth",
+                      });
+                    }}
                   >
                     Sign up
                   </Link>

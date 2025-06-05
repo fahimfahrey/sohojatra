@@ -194,6 +194,10 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
       );
       toast.success("Ride cancelled successfully");
       navigate("/dashboard");
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
     } catch (error) {
       toast.error(
         "Failed to cancel ride. The ride might have already been completed."
@@ -214,6 +218,10 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
       );
       toast.success("Ride completed successfully");
       navigate("/dashboard");
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
     } catch (error) {
       toast.error("Failed to complete ride");
       console.error(error);
@@ -470,7 +478,13 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
             )}
 
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => {
+                window.scrollTo({
+                  top: 0,
+                  behavior: "smooth",
+                });
+                navigate(-1);
+              }}
               className="w-full sm:flex-1 border-2 border-gray-200 hover:border-accent-300 hover:bg-accent-50 text-gray-700 hover:text-accent-700 px-4 sm:px-6 py-3 rounded-lg sm:rounded-xl font-semibold transition-all duration-200 text-sm sm:text-base"
             >
               Go Back

@@ -369,6 +369,12 @@ const HomePage: React.FC = () => {
                 {!isAuthenticated ? (
                   <>
                     <Link
+                      onClick={() => {
+                        window.scrollTo({
+                          top: 0,
+                          behavior: "smooth",
+                        });
+                      }}
                       to="/register"
                       className="group px-8 sm:px-10 py-4 sm:py-5 bg-white text-accent-600 hover:bg-gray-50 rounded-2xl font-bold text-base sm:text-lg transition-all duration-300 transform hover:scale-105 shadow-large flex items-center justify-center gap-2 sm:gap-3"
                     >
@@ -376,6 +382,12 @@ const HomePage: React.FC = () => {
                       <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
                     </Link>
                     <Link
+                      onClick={() => {
+                        window.scrollTo({
+                          top: 0,
+                          behavior: "smooth",
+                        });
+                      }}
                       to="/"
                       className="px-8 sm:px-10 py-4 sm:py-5 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 rounded-2xl font-bold text-base sm:text-lg transition-all duration-300 border border-white/20 flex items-center justify-center"
                     >
@@ -385,6 +397,12 @@ const HomePage: React.FC = () => {
                 ) : (
                   <>
                     <Link
+                      onClick={() => {
+                        window.scrollTo({
+                          top: 0,
+                          behavior: "smooth",
+                        });
+                      }}
                       to="/rides"
                       className="group px-8 sm:px-10 py-4 sm:py-5 bg-white text-accent-600 hover:bg-gray-50 rounded-2xl font-bold text-base sm:text-lg transition-all duration-300 transform hover:scale-105 shadow-large flex items-center justify-center gap-2 sm:gap-3"
                     >
@@ -392,6 +410,12 @@ const HomePage: React.FC = () => {
                       <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
                     </Link>
                     <Link
+                      onClick={() => {
+                        window.scrollTo({
+                          top: 0,
+                          behavior: "smooth",
+                        });
+                      }}
                       to="/create-ride"
                       className="px-8 sm:px-10 py-4 sm:py-5 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 rounded-2xl font-bold text-base sm:text-lg transition-all duration-300 border border-white/20 flex items-center justify-center"
                     >
