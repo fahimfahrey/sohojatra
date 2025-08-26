@@ -137,7 +137,12 @@ export const signOut = async () => {
 // Google OAuth sign-in
 export const signInWithGoogle = async () => {
   // Build a redirect back to the app after OAuth completes
-  const siteUrl = window.location.origin;
+  // Use production domain for OAuth redirect
+  const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const siteUrl = isDevelopment 
+    ? window.location.origin 
+    : 'https://www.sohojatra.com'; // Replace with your actual domain
+  
   const redirectUrl = `${siteUrl}/auth/callback`;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
