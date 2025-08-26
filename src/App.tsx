@@ -24,6 +24,7 @@ import CreateRidePage from "./pages/CreateRidePage";
 import FindRidesPage from "./pages/FindRidesPage";
 import RideDetailPage from "./pages/RideDetailPage";
 import EmailConfirmationPage from "./pages/EmailConfirmationPage";
+import AuthCallbackPage from "./pages/AuthCallbackPage";
 
 // Add custom styles for leaflet markers
 import "./index.css";
@@ -146,6 +147,7 @@ function App() {
                   element={<EmailConfirmationPage />}
                 />
                 <Route path="/auth/verify" element={<VerifyEmail />} />
+                <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
                 {/* Protected Routes */}
                 <Route

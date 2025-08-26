@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { UserType } from "../types";
 import { supabase } from "../lib/supabase";
-import { signIn, signUp, signOut, getCurrentSession } from "../lib/auth";
+import { signIn, signUp, signOut, getCurrentSession, signInWithGoogle } from "../lib/auth";
 import { getAuthTokenKey } from "../lib/sessionHelper";
 
 interface AuthContextType {
@@ -9,6 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<unknown>;
+  loginWithGoogle: () => Promise<unknown>;
   register: (name: string, email: string, password: string) => Promise<unknown>;
   logout: () => void;
   isEmailConfirmed: boolean;
@@ -154,6 +155,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const loginWithGoogle = async () => {
+    setIsLoading(true);
+    try {
+      console.log("Login with Google initiated");
+      const result = await signInWithGoogle();
+      return result;
+    } catch (error) {
+      console.error("Google login error:", error);
+      throw error;
+    } finally {
+      // For OAuth, Supabase will redirect away; this finally may not run before navigation
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       console.log("Logging out user");
@@ -172,6 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         isAuthenticated: !!user,
         isLoading,
         login,
+        loginWithGoogle,
         register,
         logout,
         isEmailConfirmed,

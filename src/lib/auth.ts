@@ -134,6 +134,66 @@ export const signOut = async () => {
   }
 };
 
+// Google OAuth sign-in
+export const signInWithGoogle = async () => {
+  // Build a redirect back to the app after OAuth completes
+  const siteUrl = window.location.origin;
+  const redirectUrl = `${siteUrl}/auth/callback`;
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: redirectUrl,
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent",
+      },
+    },
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+};
+
+// Handle user creation after OAuth sign-in
+export const handleOAuthUserCreation = async (user: any) => {
+  if (!user) return;
+
+  try {
+    // Check if user exists in database
+    const { data: existingUser, error: fetchError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", user.id)
+      .single();
+
+    if (fetchError || !existingUser) {
+      // Create user if not found
+      const userName =
+        user.user_metadata?.name ||
+        user.user_metadata?.full_name ||
+        user.email?.split("@")[0] ||
+        "User";
+
+      const { error: insertError } = await supabase.from("users").upsert({
+        id: user.id,
+        email: user.email,
+        name: userName,
+      });
+
+      if (insertError && insertError.code !== "23505") {
+        // Ignore duplicate key errors
+        console.error("Error creating user during OAuth:", insertError);
+      }
+    }
+  } catch (err) {
+    console.error("Error checking/creating user during OAuth:", err);
+  }
+};
+
 export const getCurrentSession = async () => {
   const { data, error } = await supabase.auth.getSession();
   if (error) {
