@@ -123,6 +123,7 @@ interface RideMapProps {
   height?: string;
   ride?: RideRequest; // for ride detail view
   showRoute?: boolean; // whether to visualize the path between start and destination
+  showCurrentLocation?: boolean; // whether to show user's current location marker
 }
 
 const RideMap: React.FC<RideMapProps> = ({
@@ -135,6 +136,7 @@ const RideMap: React.FC<RideMapProps> = ({
   height = "400px",
   ride,
   showRoute,
+  showCurrentLocation = true,
 }) => {
   const [currentPosition, setCurrentPosition] =
     useState<[number, number]>(initialPosition);
@@ -255,9 +257,11 @@ const RideMap: React.FC<RideMapProps> = ({
         />
 
         {/* Current location marker */}
-        <Marker position={currentPosition} icon={markerIcon}>
-          <Popup>Your current location</Popup>
-        </Marker>
+        {showCurrentLocation && (
+          <Marker position={currentPosition} icon={markerIcon}>
+            <Popup>Your current location</Popup>
+          </Marker>
+        )}
 
         {/* Starting point marker */}
         {(derivedStartingPoint) && (

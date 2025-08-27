@@ -45,10 +45,9 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
   const navigate = useNavigate();
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [passengers, setPassengers] = useState<PassengerInfo[]>([]);
-  const [isJoining, setIsJoining] = useState(false);
-  const [isLeaving, setIsLeaving] = useState(false);
-  const [isCompleting, setIsCompleting] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [isJoining] = useState(false);
+  const [isLeaving] = useState(false);
+  const [isCompleting] = useState(false);
 
   const isCreator = user && ride.creator === user.id;
   const isPassenger = user && ride.passengers.includes(user.id);
@@ -298,6 +297,7 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
                 ride={ride}
                 height="250px sm:300px lg:350px"
                 showRoute={true}
+                showCurrentLocation={false}
               />
             </div>
           </div>
