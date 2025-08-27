@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from "react";
 import {
   MapContainer,
-  TileLayer,
   Marker,
   Popup,
   useMap,
   useMapEvents,
-  LayersControl,
+  Polyline,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Location, RideRequest } from "../../types";
-import { MapPin, Navigation } from "lucide-react";
+// icons not used directly here
 import MapTileLayers from "./MapTileLayers";
 
 // Fix the icon issue with Leaflet in React
@@ -71,7 +70,7 @@ const MapClickHandler = ({
   onLocationSelect?: (location: Location) => void;
   selectingLocation?: "start" | "destination" | null;
 }) => {
-  const map = useMapEvents({
+  useMapEvents({
     click: async (e) => {
       if (onLocationSelect && selectingLocation) {
         try {
@@ -122,6 +121,8 @@ interface RideMapProps {
   onLocationSelect?: (location: Location) => void;
   selectingLocation?: "start" | "destination" | null;
   height?: string;
+  ride?: RideRequest; // for ride detail view
+  showRoute?: boolean; // whether to visualize the path between start and destination
 }
 
 const RideMap: React.FC<RideMapProps> = ({
@@ -132,9 +133,56 @@ const RideMap: React.FC<RideMapProps> = ({
   onLocationSelect,
   selectingLocation,
   height = "400px",
+  ride,
+  showRoute,
 }) => {
   const [currentPosition, setCurrentPosition] =
     useState<[number, number]>(initialPosition);
+
+  // Derive start/destination from either explicit props or from ride (for detail view)
+  const derivedStartingPoint = startingPoint || ride?.startingPoint;
+  const derivedDestination = destination || ride?.destination;
+
+  // Routed path coordinates (lat, lng)
+  const [routeCoordinates, setRouteCoordinates] = useState<
+    [number, number][] | null
+  >(null);
+  const [, setIsRoutingError] = useState<boolean>(false);
+
+  // Fetch routed path via OSRM between start and destination when requested
+  useEffect(() => {
+    const fetchRoute = async () => {
+      if (!showRoute || !derivedStartingPoint || !derivedDestination) {
+        setRouteCoordinates(null);
+        return;
+      }
+
+      try {
+        setIsRoutingError(false);
+        const startLngLat = `${derivedStartingPoint.coordinates.lng},${derivedStartingPoint.coordinates.lat}`;
+        const endLngLat = `${derivedDestination.coordinates.lng},${derivedDestination.coordinates.lat}`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${startLngLat};${endLngLat}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Routing failed: ${res.status}`);
+        const data = await res.json();
+        const coords: [number, number][] =
+          data?.routes?.[0]?.geometry?.coordinates?.map(
+            (c: [number, number]) => [c[1], c[0]]
+          ) || [];
+        if (coords.length > 0) {
+          setRouteCoordinates(coords);
+        } else {
+          setRouteCoordinates(null);
+        }
+      } catch (e) {
+        console.error("Error fetching route:", e);
+        setIsRoutingError(true);
+        setRouteCoordinates(null);
+      }
+    };
+
+    fetchRoute();
+  }, [showRoute, derivedStartingPoint?.coordinates, derivedDestination?.coordinates]);
 
   // Get user's current location on component mount
   useEffect(() => {
@@ -153,8 +201,34 @@ const RideMap: React.FC<RideMapProps> = ({
     }
   }, []);
 
+  // Fit bounds to the route when both points are present
+  const FitBoundsOnRoute: React.FC = () => {
+    const map = useMap();
+    useEffect(() => {
+      if (routeCoordinates && routeCoordinates.length > 1) {
+        const bounds = L.latLngBounds(routeCoordinates as [number, number][]);
+        map.fitBounds(bounds, { padding: [30, 30] });
+        return;
+      }
+      if (derivedStartingPoint && derivedDestination) {
+        const bounds = L.latLngBounds(
+          [
+            derivedStartingPoint.coordinates.lat,
+            derivedStartingPoint.coordinates.lng,
+          ],
+          [
+            derivedDestination.coordinates.lat,
+            derivedDestination.coordinates.lng,
+          ]
+        );
+        map.fitBounds(bounds, { padding: [30, 30] });
+      }
+    }, [map, routeCoordinates, derivedStartingPoint, derivedDestination]);
+    return null;
+  };
+
   return (
-    <div className="relative z-[10] h-[200px] md:h-[400px]">
+    <div className="relative z-[10] h-[200px] md:h-[400px]" style={{ height }}>
       {selectingLocation && (
         <div className="absolute top-2 left-0 right-0 z-10 mx-auto text-center bg-white bg-opacity-90 py-2 px-4 rounded-md shadow-md text-sm max-w-xs">
           <p className="font-medium">
@@ -172,6 +246,9 @@ const RideMap: React.FC<RideMapProps> = ({
         <MapTileLayers />
 
         <RecenterAutomatically position={currentPosition} />
+        {showRoute && derivedStartingPoint && derivedDestination && (
+          <FitBoundsOnRoute />
+        )}
         <MapClickHandler
           onLocationSelect={onLocationSelect}
           selectingLocation={selectingLocation}
@@ -183,37 +260,45 @@ const RideMap: React.FC<RideMapProps> = ({
         </Marker>
 
         {/* Starting point marker */}
-        {startingPoint && (
+        {(derivedStartingPoint) && (
           <Marker
             position={[
-              startingPoint.coordinates.lat,
-              startingPoint.coordinates.lng,
+              derivedStartingPoint.coordinates.lat,
+              derivedStartingPoint.coordinates.lng,
             ]}
             icon={startIcon}
           >
             <Popup>
               <strong>Starting Point:</strong>
               <br />
-              {startingPoint.address}
+              {derivedStartingPoint.address}
             </Popup>
           </Marker>
         )}
 
         {/* Destination marker */}
-        {destination && (
+        {(derivedDestination) && (
           <Marker
             position={[
-              destination.coordinates.lat,
-              destination.coordinates.lng,
+              derivedDestination.coordinates.lat,
+              derivedDestination.coordinates.lng,
             ]}
             icon={endIcon}
           >
             <Popup>
               <strong>Destination:</strong>
               <br />
-              {destination.address}
+              {derivedDestination.address}
             </Popup>
           </Marker>
+        )}
+
+        {/* Highlight path between start and destination */}
+        {showRoute && routeCoordinates && routeCoordinates.length > 1 && (
+          <Polyline
+            positions={routeCoordinates}
+            pathOptions={{ color: "#2563eb", weight: 5, opacity: 0.8 }}
+          />
         )}
 
         {/* Render ride markers */}
