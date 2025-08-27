@@ -11,7 +11,7 @@ const RegisterForm: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,8 +51,27 @@ const RegisterForm: React.FC = () => {
           <h2 className="text-4xl font-bold text-gray-900 mb-2">Create Account</h2>
           <p className="text-gray-600">Join our community today</p>
         </div>
-
+        
         <div className="bg-white shadow-xl rounded-2xl p-8">
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => loginWithGoogle()}
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-200 rounded-2xl bg-white hover:bg-gray-50 text-gray-700 font-semibold transition-all duration-200 shadow-sm"
+            >
+              <img
+                alt="Google"
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                className="h-5 w-5"
+              />
+              Continue with Google
+            </button>
+            <div className="flex items-center my-6">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="px-3 text-xs text-gray-400 uppercase tracking-wide">or</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
