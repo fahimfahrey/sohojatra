@@ -137,7 +137,7 @@ export const signOut = async () => {
 // Google OAuth sign-in
 export const signInWithGoogle = async () => {
   // Use environment variable for redirect URL, fallback to production domain
-  const redirectUrl = import.meta.env.VITE_AUTH_REDIRECT_URL || 'https://www.sohojatra.com/auth/callback';
+  const redirectUrl = import.meta.env.VITE_AUTH_REDIRECT_URL
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
