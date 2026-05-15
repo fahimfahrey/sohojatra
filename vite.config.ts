@@ -8,7 +8,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["sohojatra_ico.png", "banner_image.png", "sohojatra.png"],
+      includeAssets: [
+        "sohojatra_ico.png",
+        "banner_image.png",
+        "sohojatra.png",
+        "sohojatra-splash.png",
+      ],
       manifest: {
         name: "Sohojatra - Ride Sharing",
         short_name: "Sohojatra",
@@ -21,13 +26,13 @@ export default defineConfig({
         start_url: "/",
         icons: [
           {
-            src: "/sohojatra.png",
+            src: "/sohojatra-splash.png",
             sizes: "200x200",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "/sohojatra.png",
+            src: "/sohojatra-splash.png",
             sizes: "200x200",
             type: "image/png",
             purpose: "maskable",
