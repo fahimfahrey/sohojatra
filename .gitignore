@@ -24,9 +24,11 @@ dist-ssr
 *.sw?
 .env
 
-# Markdown files (except readme.md)
+# Markdown files (except readme.md and PWA docs)
 *.md
 !readme.md
+!PWA_*.md
+!HOW_TO_INSTALL_PWA.md
 
 # Supabase migrations
 supabase/
