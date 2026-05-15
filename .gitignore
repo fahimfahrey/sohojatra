@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Markdown files (except readme.md)
+*.md
+!readme.md
+
+# Supabase migrations
+supabase/
+*.sql

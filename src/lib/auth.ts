@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { rateLimit } from "./rateLimit";
 
 export type SignInCredentials = {
   email: string;
@@ -12,13 +13,19 @@ export type SignUpCredentials = {
 };
 
 export const signIn = async ({ email, password }: SignInCredentials) => {
+  // Rate limit login attempts
+  if (!rateLimit(`login:${email}`, 5, 15 * 60 * 1000)) {
+    throw new Error("Too many login attempts. Please try again later.");
+  }
+
   const result = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (result.error) {
-    throw result.error;
+    // Generic error message to prevent user enumeration
+    throw new Error("Invalid email or password");
   }
 
   // Ensure the user exists in the users table
@@ -47,11 +54,10 @@ export const signIn = async ({ email, password }: SignInCredentials) => {
 
         if (insertError && insertError.code !== "23505") {
           // Ignore duplicate key errors
-          console.error("Error creating user during login:", insertError);
         }
       }
     } catch (err) {
-      console.error("Error checking/creating user during login:", err);
+      // Error handling
     }
   }
 
@@ -112,14 +118,12 @@ export const signUp = async ({ email, password, name }: SignUpCredentials) => {
       });
 
       if (profileError) {
-        console.error("Failed to create user profile", profileError);
         throw profileError;
       }
     }
   } catch (err: any) {
-    // If error is not a "record not found" error, then log it
+    // If error is not a "record not found" error, then throw it
     if (err?.code !== "PGRST116") {
-      console.error("Error checking/creating user profile:", err);
       throw err;
     }
   }
@@ -136,8 +140,28 @@ export const signOut = async () => {
 
 // Google OAuth sign-in
 export const signInWithGoogle = async () => {
-  // Use environment variable for redirect URL, fallback to production domain
-  const redirectUrl = import.meta.env.VITE_AUTH_REDIRECT_URL
+  // Allowed redirect URLs (whitelist)
+  const ALLOWED_REDIRECT_URLS = [
+    "https://sohojatra.vercel.app/auth/callback",
+    "https://sohojatra.com/auth/callback",
+    "http://localhost:5173/auth/callback", // Development only
+  ];
+
+  // Validate redirect URL
+  const validateRedirectUrl = (url: string): boolean => {
+    try {
+      return ALLOWED_REDIRECT_URLS.includes(url);
+    } catch {
+      return false;
+    }
+  };
+
+  const redirectUrl = import.meta.env.VITE_AUTH_REDIRECT_URL;
+
+  // Validate redirect URL
+  if (!validateRedirectUrl(redirectUrl)) {
+    throw new Error("Invalid redirect URL configuration");
+  }
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -185,11 +209,10 @@ export const handleOAuthUserCreation = async (user: any) => {
 
       if (insertError && insertError.code !== "23505") {
         // Ignore duplicate key errors
-        console.error("Error creating user during OAuth:", insertError);
       }
     }
   } catch (err) {
-    console.error("Error checking/creating user during OAuth:", err);
+    // Error handling
   }
 };
 

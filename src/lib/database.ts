@@ -11,7 +11,8 @@ export const fetchAllRides = async () => {
   try {
     const { data, error } = await supabase
       .from("ride_requests")
-      .select(`
+      .select(
+        `
         id,
         creator_id,
         starting_point,
@@ -23,11 +24,11 @@ export const fetchAllRides = async () => {
         contact_phone,
         created_at,
         updated_at
-      `)
+      `,
+      )
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-
 
     const transformedData = await Promise.all(
       (data || []).map(async (ride) => {
@@ -40,18 +41,17 @@ export const fetchAllRides = async () => {
           seats_available: ride.seats_available,
           total_seats: ride.total_seats,
           status: ride.status,
-          vehicle: ride.vehicle, 
+          vehicle: ride.vehicle,
           contact_phone: ride.contact_phone,
           created_at: ride.created_at,
           updated_at: ride.updated_at,
-          passengers
+          passengers,
         };
-      })
+      }),
     );
 
     return transformedData;
   } catch (error) {
-    console.error("Error fetching rides:", error);
     throw error;
   }
 };
@@ -68,11 +68,9 @@ export const fetchRidesByVehicle = async (vehicleType: VehicleType) => {
     if (error) throw error;
     return data || [];
   } catch (error) {
-    console.error("Error fetching rides by vehicle:", error);
     throw error;
   }
 };
-
 
 export const fetchRideById = async (rideId: string) => {
   const { data, error } = await supabase
@@ -88,13 +86,12 @@ export const fetchRideById = async (rideId: string) => {
       status,
       created_at,
       updated_at
-    `
+    `,
     )
     .eq("id", rideId)
     .single();
 
   if (error) {
-    console.error(`Error fetching ride ${rideId}:`, error);
     throw error;
   }
 
@@ -108,7 +105,6 @@ export const fetchRidePassengers = async (rideId: string) => {
     .eq("ride_id", rideId);
 
   if (error) {
-    console.error(`Error fetching passengers for ride ${rideId}:`, error);
     throw error;
   }
 
@@ -118,11 +114,10 @@ export const fetchRidePassengers = async (rideId: string) => {
 export const fetchRidePassengersWithDetails = async (rideId: string) => {
   const { data, error } = await supabase
     .from("ride_passengers")
-    .select("user_id, contact_phone")
+    .select("user_id, encrypted_phone")
     .eq("ride_id", rideId);
 
   if (error) {
-    console.error(`Error fetching passengers for ride ${rideId}:`, error);
     throw error;
   }
 
@@ -135,7 +130,7 @@ export const createRide = async (
   destination: Location,
   totalSeats: number,
   contactPhone: string,
-  vehicle: VehicleType
+  vehicle: VehicleType,
 ) => {
   // Insert the ride
   const { data, error } = await supabase
@@ -154,20 +149,20 @@ export const createRide = async (
     .single();
 
   if (error) {
-    console.error("Error creating ride:", error);
     throw error;
   }
 
   // Add creator as a passenger
+  // Phone number will be encrypted by database trigger
   const { error: passengerError } = await supabase
     .from("ride_passengers")
     .insert({
       ride_id: data.id,
       user_id: creatorId,
+      contact_phone: contactPhone, // Encrypted by database trigger
     });
 
   if (passengerError) {
-    console.error("Error adding creator as passenger:", passengerError);
     throw passengerError;
   }
 
@@ -177,19 +172,19 @@ export const createRide = async (
 export const joinRide = async (
   rideId: string,
   userId: string,
-  contactPhone: string
+  contactPhone: string,
 ) => {
   // Add user as passenger
+  // Phone number will be encrypted by database trigger
   const { error: passengerError } = await supabase
     .from("ride_passengers")
     .insert({
       ride_id: rideId,
       user_id: userId,
-      contact_phone: contactPhone,
+      contact_phone: contactPhone, // Encrypted by database trigger
     });
 
   if (passengerError) {
-    console.error("Error joining ride:", passengerError);
     throw passengerError;
   }
 
@@ -201,7 +196,6 @@ export const joinRide = async (
     .single();
 
   if (rideError) {
-    console.error("Error getting ride details:", rideError);
     throw rideError;
   }
 
@@ -218,7 +212,6 @@ export const joinRide = async (
     .eq("id", rideId);
 
   if (updateError) {
-    console.error("Error updating ride after join:", updateError);
     throw updateError;
   }
 
@@ -234,7 +227,6 @@ export const fetchUserNotifications = async (userId: string) => {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching notifications:", error);
     throw error;
   }
 
@@ -245,7 +237,7 @@ export const createNotification = async (
   userId: string,
   message: string,
   type: string,
-  rideId?: string
+  rideId?: string,
 ) => {
   const { data, error } = await supabase
     .from("notifications")
@@ -260,7 +252,6 @@ export const createNotification = async (
     .single();
 
   if (error) {
-    console.error("Error creating notification:", error);
     throw error;
   }
 
@@ -297,11 +288,9 @@ export const createNotification = async (
           notificationId: data.id,
           type,
         },
-      }).catch((err) =>
-        console.error("Error showing browser notification:", err)
-      );
-    } else {
-      console.log("Browser notifications not supported on this device");
+      }).catch((err) => {
+        // Error showing notification
+      });
     }
   }
 
@@ -310,7 +299,7 @@ export const createNotification = async (
 
 export const markNotificationAsRead = async (
   notificationId: string,
-  userId: string
+  userId: string,
 ) => {
   const { error } = await supabase
     .from("notifications")
@@ -319,7 +308,6 @@ export const markNotificationAsRead = async (
     .eq("user_id", userId);
 
   if (error) {
-    console.error("Error marking notification as read:", error);
     throw error;
   }
 };
@@ -332,7 +320,6 @@ export const markAllNotificationsAsRead = async (userId: string) => {
     .eq("read", false);
 
   if (error) {
-    console.error("Error marking all notifications as read:", error);
     throw error;
   }
 };
@@ -340,11 +327,9 @@ export const markAllNotificationsAsRead = async (userId: string) => {
 export const updateRideStatus = async (
   rideId: string,
   status: RideStatus,
-  preserveFields = true
+  preserveFields = true,
 ) => {
   try {
-    console.log(`Updating ride ${rideId} status to ${status}`);
-
     // First, get the current ride data if we want to preserve fields
     let existingData = {};
     if (preserveFields) {
@@ -356,9 +341,7 @@ export const updateRideStatus = async (
           .single();
 
         if (error) {
-          console.error("Error fetching ride for status update:", error);
           // Continue with minimal data instead of throwing
-          console.log("Will proceed with minimal data for update");
         } else if (data) {
           existingData = data;
 
@@ -367,16 +350,11 @@ export const updateRideStatus = async (
             (data.status === "completed" || data.status === "cancelled") &&
             (status === "open" || status === "full")
           ) {
-            console.warn(
-              `Prevented changing ride ${rideId} from ${data.status} to ${status}`
-            );
             return data; // Return existing data without making changes
           }
         }
       } catch (fetchError) {
-        console.error("Failed to fetch ride data:", fetchError);
         // Continue with minimal data instead of throwing
-        console.log("Will proceed with minimal data for update");
       }
     }
 
@@ -394,17 +372,11 @@ export const updateRideStatus = async (
       .select();
 
     if (error) {
-      console.error(
-        `Error updating ride ${rideId} status to ${status}:`,
-        error
-      );
       throw error;
     }
 
-    console.log(`Successfully updated ride ${rideId} status to ${status}`);
     return data?.[0] || updateData;
   } catch (error) {
-    console.error(`Failed to update ride ${rideId} status:`, error);
     throw error;
   }
 };

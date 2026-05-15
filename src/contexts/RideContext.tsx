@@ -41,9 +41,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
   const { publishEvent, subscribeToEvent } = useAbly();
 
   // Function to fetch all rides (can be called directly)
-  const fetchRides = async () => {
-    console.log("Fetching all rides from the database");
-    try {
+  const fetchRides = async () => {    try {
       // With RLS enabled, this will only return rides the user can access
       const { data, error } = await supabase.from("ride_requests").select(`
           id,
@@ -58,14 +56,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           contact_phone
         `);
 
-      if (error) {
-        console.error("Error fetching rides:", error);
-        return;
+      if (error) {        return;
       }
 
-      if (data) {
-        console.log(`Fetched ${data.length} rides from database`);
-        // Transform data to match our RideRequest type
+      if (data) {        // Transform data to match our RideRequest type
         const transformedRides = await Promise.all(
           data.map(async (ride) => {
             // Fetch passengers for each ride
@@ -74,9 +68,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
               .select("user_id")
               .eq("ride_id", ride.id);
 
-            if (passengersError) {
-              console.error("Error fetching passengers for ride:", ride.id, passengersError);
-            }
+            if (passengersError) {            }
 
             const passengerIds = passengers
               ? passengers.map((p) => p.user_id)
@@ -99,21 +91,15 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
         );
 
         // Filter out any null values that might have come from errors
-        const validRides = transformedRides.filter(Boolean) as RideRequest[];
-        console.log(`Processed ${validRides.length} valid rides`);
-        setRides(validRides);
+        const validRides = transformedRides.filter(Boolean) as RideRequest[];        setRides(validRides);
       }
-    } catch (error) {
-      console.error("Error in ride fetching process:", error);
-    } finally {
+    } catch (error) {    } finally {
       setLoading(false);
     }
   };
 
   // Public function to refresh all rides from the database
-  const refreshAllRides = async () => {
-    console.log("Manual refresh of all rides requested");
-    await fetchRides();
+  const refreshAllRides = async () => {    await fetchRides();
   };
 
   // Load rides from Supabase
@@ -130,9 +116,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           schema: "public",
           table: "ride_requests",
         },
-        (payload) => {
-          console.log("Ride update detected:", payload);
-          // Immediately fetch the updated ride to ensure we have the latest status
+        (payload) => {          // Immediately fetch the updated ride to ensure we have the latest status
           if (
             payload.new &&
             typeof payload.new === "object" &&
@@ -144,14 +128,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
               .eq("id", payload.new.id)
               .single()
               .then(({ data, error }) => {
-                if (error) {
-                  console.error("Error fetching updated ride:", error);
-                  return;
+                if (error) {                  return;
                 }
 
-                if (data) {
-                  console.log("Updated ride data received:", data);
-                  // Update the specific ride in our state
+                if (data) {                  // Update the specific ride in our state
                   setRides((prevRides) =>
                     prevRides.map((ride) =>
                       ride.id === data.id
@@ -183,9 +163,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           schema: "public",
           table: "ride_passengers",
         },
-        (payload) => {
-          console.log("Passenger update detected:", payload);
-          // Always fetch all rides when passengers change to ensure correct state
+        (payload) => {          // Always fetch all rides when passengers change to ensure correct state
           fetchRides();
         }
       )
@@ -195,9 +173,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
     let unsubscribeSync = () => {};
 
     if (subscribeToEvent) {
-      unsubscribeSync = subscribeToEvent("rides", "sync", () => {
-        console.log("Sync event received, fetching all rides");
-        // Immediate full refresh
+      unsubscribeSync = subscribeToEvent("rides", "sync", () => {        // Immediate full refresh
         fetchRides();
       });
     }
@@ -241,9 +217,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
         .select()
         .single();
 
-      if (rideError) {
-        console.error("Error creating ride:", rideError);
-        throw new Error(rideError.message);
+      if (rideError) {        throw new Error(rideError.message);
       }
 
       if (!rideData) {
@@ -259,9 +233,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           contact_phone: contactPhone,
         });
 
-      if (passengerError) {
-        console.error("Error adding passenger:", passengerError);
-        throw new Error(passengerError.message);
+      if (passengerError) {        throw new Error(passengerError.message);
       }
 
       // Create ride object for the client
@@ -281,9 +253,6 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Update local state immediately
       setRides((prevRides) => [...prevRides, newRide]);
-
-      console.log("New ride created with ID:", newRide.id);
-
       // Emit Ably event for real-time updates
       publishEvent("rides", "new", newRide);
 
@@ -320,9 +289,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
       }, 3000);
 
       return newRide;
-    } catch (error) {
-      console.error("Error creating ride:", error);
-      throw error;
+    } catch (error) {      throw error;
     }
   };
 
@@ -356,9 +323,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           contact_phone: contactPhone,
         });
 
-      if (passengerError) {
-        console.error("Error joining ride:", passengerError);
-        throw new Error(passengerError.message);
+      if (passengerError) {        throw new Error(passengerError.message);
       }
 
       // Update ride available seats
@@ -376,9 +341,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
         vehicle: ride.vehicle,
       });
 
-      if (rideError) {
-        console.error("Error updating ride:", rideError);
-        throw new Error(rideError.message);
+      if (rideError) {        throw new Error(rideError.message);
       }
 
       // Update local state
@@ -396,9 +359,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
       // Emit Ably events
       publishEvent("rides", "update", updatedRide);
       publishEvent("rides", "join", updatedRide);
-    } catch (error) {
-      console.error("Error joining ride:", error);
-      throw error;
+    } catch (error) {      throw error;
     }
   };
 
@@ -421,11 +382,6 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
     ) {
       throw new Error("Cannot leave a completed or cancelled ride");
     }
-
-    console.log(
-      `Canceling/leaving ride ${rideId}, status: ${ride.status}, user: ${user.id}, creator: ${ride.creator}`
-    );
-
     try {
       // If user is the creator, cancel the entire ride
       if (ride.creator === user.id) {
@@ -438,25 +394,13 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
         // Update rides in local state immediately
         setRides((prevRides) =>
           prevRides.map((r) => (r.id === rideId ? updatedRide : r))
-        );
-
-        console.log(
-          "Emitting ride update event for cancelled ride:",
-          updatedRide
-        );
-        // Emit Ably event
+        );        // Emit Ably event
         publishEvent("rides", "update", updatedRide);
 
         // Try to update the backend status
         try {
           // Use the utility function to update ride status
-          await updateRideStatus(rideId, "cancelled");
-          console.log(
-            "Successfully updated ride status to cancelled in database"
-          );
-        } catch (dbError) {
-          console.error("Error updating ride status in database:", dbError);
-          // We continue anyway as the local state is already updated
+          await updateRideStatus(rideId, "cancelled");        } catch (dbError) {          // We continue anyway as the local state is already updated
         }
 
         // Notify all passengers that the ride has been cancelled
@@ -466,16 +410,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
             `The ride to ${ride.destination.address} has been cancelled by the driver.`,
             "update"
           );
-        } catch (notifyError) {
-          console.error("Error notifying passengers:", notifyError);
-          // Continue execution even if notification fails
+        } catch (notifyError) {          // Continue execution even if notification fails
         }
       } else {
         // If user is just a passenger, remove them from the ride
-        console.log(
-          `Passenger ${user.id} leaving ride ${rideId} with status ${ride.status}`
-        );
-
         // First verify the current ride status directly from the database
         const { data: currentRide, error: rideCheckError } = await supabase
           .from("ride_requests")
@@ -483,9 +421,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           .eq("id", rideId)
           .single();
 
-        if (rideCheckError) {
-          console.error("Error checking current ride status:", rideCheckError);
-          throw new Error(rideCheckError.message);
+        if (rideCheckError) {          throw new Error(rideCheckError.message);
         }
 
         // Double-check if ride is completed or cancelled in the database
@@ -493,11 +429,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           currentRide &&
           (currentRide.status === "completed" ||
             currentRide.status === "cancelled")
-        ) {
-          console.log(
-            `Confirmed ride ${rideId} has ${currentRide.status} status in database, blocking status change`
-          );
-          throw new Error(`Cannot leave a ${currentRide.status} ride`);
+        ) {          throw new Error(`Cannot leave a ${currentRide.status} ride`);
         }
 
         const { error: passengerError } = await supabase
@@ -506,9 +438,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           .eq("ride_id", rideId)
           .eq("user_id", user.id);
 
-        if (passengerError) {
-          console.error("Error removing passenger:", passengerError);
-        }
+        if (passengerError) {        }
 
         // Only update ride status if it's not already completed or cancelled
         if (ride.status !== "completed" && ride.status !== "cancelled") {
@@ -529,9 +459,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
               vehicle: ride.vehicle,
             });
 
-          if (rideError) {
-            console.error("Error updating ride after passenger left:", rideError);
-          }
+          if (rideError) {          }
 
           // Update local state
           const updatedRide = {
@@ -548,11 +476,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           // Emit Ably events
           publishEvent("rides", "update", updatedRide);
           publishEvent("rides", "leave", updatedRide);
-        } else {
-          console.log(
-            `Ride ${rideId} has status ${ride.status}, not updating seat availability`
-          );
-          
+        } else {          
           // Just remove the passenger from local state without changing seat availability
           const newPassengers = ride.passengers.filter((p) => p !== user.id);
           const updatedRide = {
@@ -567,9 +491,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           publishEvent("rides", "leave", updatedRide);
         }
       }
-    } catch (error) {
-      console.error("Error canceling ride:", error);
-      throw error;
+    } catch (error) {      throw error;
     }
   };
 
@@ -595,22 +517,14 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
       // Update rides in local state immediately
       setRides((prevRides) =>
         prevRides.map((r) => (r.id === rideId ? updatedRide : r))
-      );
-
-      console.log(
-        "Emitting ride update event for completed ride:",
-        updatedRide
-      );
-      // Emit Ably event
+      );      // Emit Ably event
       publishEvent("rides", "update", updatedRide);
 
       // Try to update the backend status
       try {
         // Use the utility function to update ride status
         await updateRideStatus(rideId, "completed");
-      } catch (dbError) {
-        console.error("Error updating ride status in database:", dbError);
-        // We continue anyway as the local state is already updated
+      } catch (dbError) {        // We continue anyway as the local state is already updated
       }
 
       // Notify all passengers that the ride has been completed
@@ -620,13 +534,9 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           `Your ride to ${ride.destination.address} has been completed.`,
           "update"
         );
-      } catch (notifyError) {
-        console.error("Error notifying passengers:", notifyError);
-        // Continue execution even if notification fails
+      } catch (notifyError) {        // Continue execution even if notification fails
       }
-    } catch (error) {
-      console.error("Error completing ride:", error);
-      throw error;
+    } catch (error) {      throw error;
     }
   };
 
@@ -641,9 +551,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
     startPoint: Location,
     endPoint: Location,
     vehicleFilter?: VehicleType | null
-  ): RideRequest[] => {
-    console.log("Finding matching rides with vehicle filter:", vehicleFilter);
-    
+  ): RideRequest[] => {    
     // Find rides where both starting point and destination are within 1km of the given points
     let matchingRides = rides.filter(
       (ride) =>
@@ -656,16 +564,12 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
     if (vehicleFilter) {
       matchingRides = matchingRides.filter(
         (ride) => ride.vehicle === vehicleFilter
-      );
-      console.log(`Filtered by vehicle ${vehicleFilter}, found ${matchingRides.length} rides`);
-    }
+      );    }
 
     return matchingRides;
   };
 
-  const syncRideStatus = async (rideId: string) => {
-    console.log(`Syncing ride status for ride ${rideId}`);
-    try {
+  const syncRideStatus = async (rideId: string) => {    try {
       // Get the ride status directly from the database
       const { data, error } = await supabase
         .from("ride_requests")
@@ -673,25 +577,14 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("id", rideId)
         .single();
 
-      if (error) {
-        console.error(`Error fetching ride ${rideId} for status sync:`, error);
-        return;
+      if (error) {        return;
       }
 
-      if (!data) {
-        console.warn(`Ride ${rideId} not found for status sync`);
-        return;
+      if (!data) {        return;
       }
-
-      console.log(
-        `Database status for ride ${rideId}: ${data.status}, seats: ${data.seats_available}, vehicle: ${data.vehicle}`
-      );
-
       // Find the ride in local state
       const localRide = rides.find((r) => r.id === rideId);
-      if (!localRide) {
-        console.warn(`Ride ${rideId} not found in local state for status sync`);
-        return;
+      if (!localRide) {        return;
       }
 
       // Check if status needs to be updated
@@ -700,10 +593,6 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
         localRide.seatsAvailable !== data.seats_available ||
         localRide.vehicle !== data.vehicle
       ) {
-        console.log(
-          `Updating local ride ${rideId} status from ${localRide.status} to ${data.status}`
-        );
-
         // Update local state to match database
         const updatedRide = {
           ...localRide,
@@ -716,9 +605,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({
           prevRides.map((r) => (r.id === rideId ? updatedRide : r))
         );
       }
-    } catch (error) {
-      console.error(`Error syncing ride ${rideId} status:`, error);
-    }
+    } catch (error) {    }
   };
 
   return (
