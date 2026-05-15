@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { Notification, RideRequest } from "../types";
+import { NotificationMessage, RideRequest } from "../types";
 import { useAuth } from "./AuthContext";
 import { useAbly } from "./AblyContext";
 import { toast } from "react-hot-toast";
@@ -7,32 +7,31 @@ import { supabase } from "../lib/supabase";
 import * as Ably from "ably";
 import {
   showBrowserNotification,
-  requestNotificationPermission,
   registerServiceWorker,
   isMobileDevice,
   isNotificationSupported,
 } from "../lib/browserNotifications";
 
 interface NotificationContextType {
-  notifications: Notification[];
+  notifications: NotificationMessage[];
   unreadCount: number;
   addNotification: (
     message: string,
-    type: Notification["type"],
-    rideId?: string
+    type: NotificationMessage["type"],
+    rideId?: string,
   ) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
-  undefined
+  undefined,
 );
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
   const [notificationPermissionRequested, setNotificationPermissionRequested] =
     useState(false);
   const [isDeviceMobile, setIsDeviceMobile] = useState(false);
@@ -48,17 +47,21 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       const supported = isNotificationSupported();
 
       setIsDeviceMobile(mobile);
-      setAreNotificationsSupported(supported);    }
+      setAreNotificationsSupported(supported);
+    }
   }, []);
 
-  // Initialize service worker and request notification permission
+  // Initialize service worker only (don't request permission automatically)
   useEffect(() => {
     const initializeNotifications = async () => {
       if (!notificationPermissionRequested && areNotificationsSupported) {
-        await requestNotificationPermission();
-        if (!isDeviceMobile) {
-          // Service workers can be problematic on some mobile browsers
-          await registerServiceWorker();
+        // Only register service worker if permission is already granted
+        // Don't request permission automatically - this causes Firefox warnings
+        if (Notification.permission === "granted") {
+          if (!isDeviceMobile) {
+            // Service workers can be problematic on some mobile browsers
+            await registerServiceWorker();
+          }
         }
         setNotificationPermissionRequested(true);
       }
@@ -86,24 +89,25 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
 
-        if (error) {          return;
+        if (error) {
+          return;
         }
 
         if (data) {
-          // Transform data to match our Notification type
+          // Transform data to match our NotificationMessage type
           const transformedNotifications = data.map((notification) => ({
             id: notification.id,
             userId: notification.user_id,
             message: notification.message,
             read: notification.read,
-            type: notification.type as Notification["type"],
+            type: notification.type as NotificationMessage["type"],
             rideId: notification.ride_id,
             createdAt: notification.created_at,
           }));
 
           setNotifications(transformedNotifications);
         }
-      } catch (error) {      }
+      } catch (error) {}
     };
 
     fetchNotifications();
@@ -121,7 +125,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         },
         () => {
           fetchNotifications();
-        }
+        },
       )
       .subscribe();
 
@@ -147,7 +151,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           notificationMessage = `Your ride to ${data.destination.address} has been cancelled.`;
         } else {
           notificationMessage = `Ride to ${data.destination.address} has been updated.`;
-        }        addNotification(notificationMessage, "update", data.id);
+        }
+        addNotification(notificationMessage, "update", data.id);
       }
     };
 
@@ -174,13 +179,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     const unsubscribeUpdate = subscribeToEvent(
       "rides",
       "update",
-      handleRideUpdate
+      handleRideUpdate,
     );
     const unsubscribeJoin = subscribeToEvent("rides", "join", handleRideJoin);
     const unsubscribeLeave = subscribeToEvent(
       "rides",
       "leave",
-      handleRideLeave
+      handleRideLeave,
     );
 
     return () => {
@@ -191,13 +196,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [user, subscribeToEvent]);
 
   const unreadCount = notifications.filter(
-    (notification) => !notification.read
+    (notification) => !notification.read,
   ).length;
 
   const addNotification = async (
     message: string,
-    type: Notification["type"],
-    rideId?: string
+    type: NotificationMessage["type"],
+    rideId?: string,
   ) => {
     if (!user) return;
 
@@ -215,14 +220,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         .select()
         .single();
 
-      if (error) {        return;
+      if (error) {
+        return;
       }
 
-      if (!data) {        return;
+      if (!data) {
+        return;
       }
 
       // Create notification object for the client
-      const newNotification: Notification = {
+      const newNotification: NotificationMessage = {
         id: data.id,
         userId: user.id,
         message,
@@ -241,10 +248,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           type === "match"
             ? "🔍"
             : type === "join"
-            ? "👤"
-            : type === "leave"
-            ? "👋"
-            : "🔔",
+              ? "👤"
+              : type === "leave"
+                ? "👋"
+                : "🔔",
         duration: 4000,
       });
 
@@ -276,9 +283,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
             notificationId: data.id,
             type,
           },
-        }).catch((err) => {        });
+        }).catch((err) => {});
       }
-    } catch (error) {    }
+    } catch (error) {}
   };
 
   const markAsRead = async (id: string) => {
@@ -287,7 +294,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       // Make sure the notification exists and belongs to the user
       const notificationToUpdate = notifications.find((n) => n.id === id);
-      if (!notificationToUpdate || notificationToUpdate.userId !== user.id) {        return;
+      if (!notificationToUpdate || notificationToUpdate.userId !== user.id) {
+        return;
       }
 
       // Get the full notification data to preserve all fields
@@ -297,7 +305,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("id", id)
         .single();
 
-      if (fetchError) {        return;
+      if (fetchError) {
+        return;
       }
 
       // Update the notification preserving all fields
@@ -306,7 +315,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         read: true,
       });
 
-      if (error) {        return;
+      if (error) {
+        return;
       }
 
       // Update local state
@@ -314,10 +324,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         prev.map((notification) =>
           notification.id === id
             ? { ...notification, read: true }
-            : notification
-        )
+            : notification,
+        ),
       );
-    } catch (error) {    }
+    } catch (error) {}
   };
 
   const markAllAsRead = async () => {
@@ -325,7 +335,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Check if there are any unread notifications
     const unreadNotificationsExist = notifications.some(
-      (notification) => !notification.read
+      (notification) => !notification.read,
     );
     if (!unreadNotificationsExist) return;
 
@@ -337,7 +347,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("user_id", user.id)
         .eq("read", false);
 
-      if (fetchError) {        return;
+      if (fetchError) {
+        return;
       }
 
       if (!unreadNotifications || unreadNotifications.length === 0) {
@@ -352,14 +363,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const { error } = await supabase.from("notifications").upsert(updates);
 
-      if (error) {        return;
+      if (error) {
+        return;
       }
 
       // Update local state
       setNotifications((prev) =>
-        prev.map((notification) => ({ ...notification, read: true }))
+        prev.map((notification) => ({ ...notification, read: true })),
       );
-    } catch (error) {    }
+    } catch (error) {}
   };
 
   return (
@@ -381,7 +393,7 @@ export const useNotification = () => {
   const context = useContext(NotificationContext);
   if (context === undefined) {
     throw new Error(
-      "useNotification must be used within a NotificationProvider"
+      "useNotification must be used within a NotificationProvider",
     );
   }
   return context;

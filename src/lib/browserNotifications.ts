@@ -74,7 +74,7 @@ export const registerServiceWorker =
     return null;
   };
 
-// Show a browser notification
+// Show a browser notification (assumes permission is already granted)
 export const showBrowserNotification = async (
   title: string,
   options: {
@@ -94,9 +94,9 @@ export const showBrowserNotification = async (
     return false;
   }
 
-  // Check and request permission if needed
-  const hasPermission = await requestNotificationPermission();
-  if (!hasPermission) {
+  // Check if permission is already granted
+  // Don't request permission here - this must be done in a user event handler
+  if (Notification.permission !== "granted") {
     return false;
   }
 

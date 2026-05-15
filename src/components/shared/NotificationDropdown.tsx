@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useNotification } from "../../contexts/NotificationContext";
 import { Bell, CheckCircle, Info, Users } from "lucide-react";
+import { requestNotificationPermission } from "../../lib/browserNotifications";
 
 interface NotificationDropdownProps {
   onClose: () => void;
@@ -13,6 +14,14 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   isMobileDrawer = false,
 }) => {
   const { notifications, markAsRead, markAllAsRead } = useNotification();
+  const [permissionStatus, setPermissionStatus] = useState<
+    "granted" | "denied" | "default"
+  >(typeof Notification !== "undefined" ? Notification.permission : "default");
+
+  const handleRequestPermission = async () => {
+    const granted = await requestNotificationPermission();
+    setPermissionStatus(granted ? "granted" : "denied");
+  };
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -62,8 +71,8 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   };
 
   // Different styling for mobile drawer vs desktop dropdown
-  const containerClass = isMobileDrawer 
-    ? "w-full bg-white" 
+  const containerClass = isMobileDrawer
+    ? "w-full bg-white"
     : "absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-large border border-gray-200 z-50";
 
   return (
@@ -117,7 +126,9 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                     <div className="flex justify-between">
                       <p
                         className={`text-sm leading-relaxed ${
-                          !notification.read ? "font-medium text-gray-900" : "text-gray-700"
+                          !notification.read
+                            ? "font-medium text-gray-900"
+                            : "text-gray-700"
                         }`}
                       >
                         {notification.message}
@@ -145,6 +156,16 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
 
       {!isMobileDrawer && (
         <div className="p-4 bg-gray-50 border-t border-gray-200 rounded-b-2xl">
+          {permissionStatus !== "granted" && (
+            <button
+              onClick={handleRequestPermission}
+              className="w-full py-2 mb-2 text-sm bg-accent-600 text-white hover:bg-accent-700 transition-colors font-medium rounded-lg"
+            >
+              {permissionStatus === "denied"
+                ? "Notifications Blocked"
+                : "Enable Notifications"}
+            </button>
+          )}
           <button
             onClick={onClose}
             className="w-full py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors font-medium"
