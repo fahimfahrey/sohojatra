@@ -18,7 +18,7 @@ const FindRideForm: React.FC = () => {
   );
   const [showVehicleFilter, setShowVehicleFilter] = useState(false);
 
-  const { findMatchingRides, refreshAllRides } = useRide();
+  const { findMatchingRides, refreshUserRides } = useRide();
   const { subscribeToEvent } = useAbly();
 
   // Function to refresh matching rides - memoized to avoid recreating on every render
@@ -26,11 +26,15 @@ const FindRideForm: React.FC = () => {
     if (searched && startingPoint && destination) {
       console.log("Refreshing ride matches...");
 
-      // First refresh the full database data to ensure we have the latest rides
-      await refreshAllRides();
+      // First refresh the user's own rides
+      await refreshUserRides();
 
-      // Get all matching rides without vehicle filter
-      const updatedRides = findMatchingRides(startingPoint, destination, null);
+      // Get all matching rides without vehicle filter (server-side search)
+      const updatedRides = await findMatchingRides(
+        startingPoint,
+        destination,
+        null,
+      );
       console.log(`Found ${updatedRides.length} total matching rides`);
 
       // Update the all matching rides
@@ -55,7 +59,7 @@ const FindRideForm: React.FC = () => {
     destination,
     selectedVehicle,
     findMatchingRides,
-    refreshAllRides,
+    refreshUserRides,
   ]);
 
   // Apply vehicle filter when vehicle selection changes
@@ -164,11 +168,11 @@ const FindRideForm: React.FC = () => {
     setShowVehicleFilter(false); // Hide vehicle filter initially
     setSelectedVehicle(null); // Clear any previous vehicle selection
 
-    // First refresh the full database data to ensure we have the latest rides
-    await refreshAllRides();
+    // First refresh the user's own rides
+    await refreshUserRides();
 
-    // Get all matching rides without vehicle filter
-    const rides = findMatchingRides(startingPoint, destination, null);
+    // Get all matching rides without vehicle filter (server-side search)
+    const rides = await findMatchingRides(startingPoint, destination, null);
     setAllMatchingRides(rides);
     setFilteredRides(rides);
   };
