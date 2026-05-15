@@ -16,7 +16,13 @@ export type Location = {
 
 export type RideStatus = "open" | "full" | "completed" | "cancelled";
 
-export type VehicleType = "Rickshaw" | "CNG" | "Bike" | "Bus" | "Car" | "Uber/Pathao";
+export type VehicleType =
+  | "Rickshaw"
+  | "CNG"
+  | "Bike"
+  | "Bus"
+  | "Car"
+  | "Uber/Pathao";
 
 export type RideRequest = {
   id: string;
@@ -27,7 +33,7 @@ export type RideRequest = {
   totalSeats: number;
   passengers: string[];
   status: RideStatus;
-  vehicle: VehicleType
+  vehicle: VehicleType;
   createdAt: string;
   contactPhone?: string;
 };
@@ -44,14 +50,16 @@ export const VEHICLE_OPTIONS: VehicleOption[] = [
     value: "Rickshaw",
     label: "Rickshaw",
     icon: "🚲",
-    description: "Traditional cycle rickshaw - eco-friendly and affordable for short distances",
+    description:
+      "Traditional cycle rickshaw - eco-friendly and affordable for short distances",
   },
   {
     value: "CNG",
     label: "CNG Auto-rickshaw",
     icon: "🛺",
-    description: "3-wheeler auto-rickshaw - fast and economical for medium distances",
-    },
+    description:
+      "3-wheeler auto-rickshaw - fast and economical for medium distances",
+  },
   {
     value: "Bike",
     label: "Motorcycle",
@@ -61,13 +69,13 @@ export const VEHICLE_OPTIONS: VehicleOption[] = [
   {
     value: "Uber/Pathao",
     label: "Ride Sharing",
-    description: "Book a ride via Uber or Pathao app - convenient for all distances",
+    description:
+      "Book a ride via Uber or Pathao app - convenient for all distances",
     icon: "📱",
-  }
+  },
 ];
 
-
-export type Notification = {
+export type NotificationMessage = {
   id: string;
   userId: string;
   message: string;

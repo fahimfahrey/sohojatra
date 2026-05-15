@@ -23,7 +23,7 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
   const { rides, syncRideStatus } = useRide();
   const { subscribeToEvent } = useAbly();
   const [creatorPhone, setCreatorPhone] = useState<string | undefined>(
-    DEBUG_MODE ? "1234567890" : undefined
+    DEBUG_MODE ? "1234567890" : undefined,
   );
   const [showButton, setShowButton] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
@@ -31,8 +31,8 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
 
   // Add debug info
   const addDebugInfo = (info: string) => {
-    console.log("[FloatingCall]", info);
     if (DEBUG_MODE) {
+      console.log("[FloatingCall]", info);
       setDebugInfo((prev) => [...prev, info]);
     }
   };
@@ -68,7 +68,7 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
           r.passengers.includes(user.id) &&
           r.creator !== user.id &&
           r.status !== "completed" &&
-          r.status !== "cancelled"
+          r.status !== "cancelled",
       );
       addDebugInfo(`Filtered rides by ID ${rideId}: ${activeRides.length}`);
     } else {
@@ -78,10 +78,10 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
           r.passengers.includes(user.id) &&
           r.status !== "completed" &&
           r.status !== "cancelled" &&
-          r.creator !== user.id
+          r.creator !== user.id,
       );
       addDebugInfo(
-        `Found ${activeRides.length} active rides where user is passenger`
+        `Found ${activeRides.length} active rides where user is passenger`,
       );
     }
 
@@ -158,7 +158,7 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
 
         if (status === "completed" || status === "cancelled") {
           addDebugInfo(
-            `Active ride ${rideId} status changed to ${status} - hiding button immediately`
+            `Active ride ${rideId} status changed to ${status} - hiding button immediately`,
           );
 
           // Force direct state updates to ensure immediate hiding
@@ -179,25 +179,25 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
     const unsubscribeUpdate = subscribeToEvent(
       "rides",
       "update",
-      handleRideUpdate
+      handleRideUpdate,
     );
 
     const unsubscribeComplete = subscribeToEvent(
       "rides",
       "complete",
-      handleRideUpdate
+      handleRideUpdate,
     );
 
     const unsubscribeCancel = subscribeToEvent(
       "rides",
       "cancel",
-      handleRideUpdate
+      handleRideUpdate,
     );
 
     const unsubscribeLeave = subscribeToEvent(
       "rides",
       "leave",
-      handleRideUpdate
+      handleRideUpdate,
     );
 
     // Add a periodic check to ensure button state is correct
@@ -223,13 +223,13 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
     addDebugInfo(
       `FloatingCallButton initialized. User: ${user?.id || "none"}, Rides: ${
         rides.length
-      }`
+      }`,
     );
 
     if (user && rides.length > 0) {
       // Log all rides where user is a passenger
       const userRides = rides.filter(
-        (r) => r.passengers.includes(user.id) && r.creator !== user.id
+        (r) => r.passengers.includes(user.id) && r.creator !== user.id,
       );
       addDebugInfo(`User rides (as passenger): ${userRides.length}`);
 
@@ -238,7 +238,7 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
           addDebugInfo(
             `Ride ${i}: ID=${ride.id}, Status=${ride.status}, Has phone: ${
               ride.contactPhone ? "yes" : "no"
-            }`
+            }`,
           );
         });
       }
@@ -249,7 +249,7 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
   const fetchCreatorPhone = async (rideId: string, creatorId: string) => {
     try {
       addDebugInfo(
-        `Fetching creator phone for ride ${rideId}, creator ${creatorId}`
+        `Fetching creator phone for ride ${rideId}, creator ${creatorId}`,
       );
       const { data, error } = await supabase
         .from("ride_passengers")
@@ -260,7 +260,7 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
 
       if (error || !data) {
         addDebugInfo(
-          `Error fetching creator phone: ${error?.message || "No data"}`
+          `Error fetching creator phone: ${error?.message || "No data"}`,
         );
         return null;
       }

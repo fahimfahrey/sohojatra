@@ -32,22 +32,27 @@ const NotificationInitializer: React.FC = () => {
         try {
           // Only register service worker if notifications are supported
           if (isSupported) {
-            // Request permission (this will only prompt if not already granted/denied)
-            await requestNotificationPermission();
-
-            // On mobile, we might want to be more careful with service worker registration
-            // Some mobile browsers have issues with service workers
-            if (!isMobile) {
-              await registerServiceWorker();
-            } else {
-              // For mobile, we might use a more cautious approach
-              try {
+            // Only request permission if user has already granted it or hasn't denied it
+            // Don't request permission automatically - let user click a button instead
+            if (Notification.permission === "granted") {
+              // Permission already granted, just register service worker
+              if (!isMobile) {
                 await registerServiceWorker();
-              } catch (mobileError) {              }
+              } else {
+                try {
+                  await registerServiceWorker();
+                } catch (mobileError) {
+                  // Mobile service worker registration failed, continue anyway
+                }
+              }
             }
-          } else {          }
+            // If permission is "denied" or "default", don't request it automatically
+            // This prevents the Firefox warning about requesting permission outside user interaction
+          }
 
-          setInitialized(true);        } catch (error) {          // Still mark as initialized to prevent endless retries
+          setInitialized(true);
+        } catch (error) {
+          // Still mark as initialized to prevent endless retries
           setInitialized(true);
         }
       }

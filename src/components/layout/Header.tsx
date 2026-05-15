@@ -31,7 +31,10 @@ const Header: React.FC = () => {
 
   return (
     <>
-      <header className="bg-white/95 backdrop-blur-sm shadow-soft sticky top-0 z-50 border-b border-gray-100">
+      <header
+        className="bg-white/95 backdrop-blur-sm shadow-soft sticky top-0 z-50 border-b border-gray-100"
+        style={{ WebkitBackdropFilter: "blur(4px)" }}
+      >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 sm:h-20">
             <div className="flex items-center">
@@ -76,7 +79,7 @@ const Header: React.FC = () => {
                       <Bell className="h-5 w-5" />
                       {unreadCount > 0 && (
                         <span className="absolute -top-1 -right-1 block h-4 w-4 xl:h-5 xl:w-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
-                          {unreadCount > 9 ? '9+' : unreadCount}
+                          {unreadCount > 9 ? "9+" : unreadCount}
                         </span>
                       )}
                     </button>
@@ -140,7 +143,7 @@ const Header: React.FC = () => {
                   <Bell className="h-5 w-5" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 block h-4 w-4 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
+                      {unreadCount > 9 ? "9+" : unreadCount}
                     </span>
                   )}
                 </button>
@@ -162,7 +165,10 @@ const Header: React.FC = () => {
 
         {/* Mobile menu - Enhanced responsive design */}
         {isMenuOpen && (
-          <div className="lg:hidden bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-medium">
+          <div
+            className="lg:hidden bg-white/95 shadow-medium border-t border-gray-200"
+            style={{ WebkitBackdropFilter: "blur(4px)" }}
+          >
             <div className="pt-2 pb-4 space-y-1 px-4">
               {user ? (
                 <>
@@ -187,7 +193,7 @@ const Header: React.FC = () => {
                   >
                     Create Ride
                   </Link>
-                  
+
                   <div className="border-t border-gray-200 pt-4 mt-4">
                     <div className="px-4 py-3 flex items-center bg-gray-50 rounded-xl mb-2">
                       <User className="h-5 w-5 text-gray-500 mr-3 flex-shrink-0" />
@@ -246,17 +252,19 @@ const Header: React.FC = () => {
       {isNotificationDrawerOpen && (
         <div className="lg:hidden fixed inset-0 z-[60]">
           {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black bg-opacity-50" 
+          <div
+            className="absolute inset-0 bg-black bg-opacity-50"
             onClick={() => setIsNotificationDrawerOpen(false)}
           />
-          
+
           {/* Drawer - Slides up from bottom */}
           <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[85vh] overflow-hidden shadow-2xl animate-slide-up">
             {/* Header */}
             <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-accent-50 to-accent-100">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Notifications
+                </h3>
                 <button
                   onClick={() => setIsNotificationDrawerOpen(false)}
                   className="p-2 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
@@ -265,10 +273,10 @@ const Header: React.FC = () => {
                 </button>
               </div>
             </div>
-            
+
             {/* Content */}
             <div className="overflow-y-auto max-h-[calc(85vh-80px)]">
-              <NotificationDropdown 
+              <NotificationDropdown
                 onClose={() => setIsNotificationDrawerOpen(false)}
                 isMobileDrawer={true}
               />
