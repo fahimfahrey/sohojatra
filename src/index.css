@@ -157,3 +157,24 @@
     color: #fdba74;
   }
 }
+
+/* PWA Splash Screen Styling */
+@media (display-mode: standalone) {
+  /* Ensure the app icon displays at the right size */
+  body {
+    --pwa-icon-size: 100px;
+  }
+}
+
+/* iOS Splash Screen Icon Size Control */
+@media (prefers-color-scheme: light) {
+  :root {
+    --splash-icon-size: 100px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --splash-icon-size: 100px;
+  }
+}
