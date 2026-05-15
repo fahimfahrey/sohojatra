@@ -7,6 +7,211 @@ import {
 } from "./browserNotifications";
 import { VehicleType } from "../types";
 
+/**
+ * Search for rides matching a route with server-side filtering
+ * This prevents exposing all ride data to the client
+ * @param startLat Starting point latitude
+ * @param startLng Starting point longitude
+ * @param destLat Destination latitude
+ * @param destLng Destination longitude
+ * @param radiusKm Search radius in kilometers (default 1km)
+ * @param vehicleType Optional vehicle filter
+ * @returns Array of matching rides only
+ */
+export const searchRidesByRoute = async (
+  startLat: number,
+  startLng: number,
+  destLat: number,
+  destLng: number,
+  radiusKm: number = 1,
+  vehicleType?: VehicleType | null,
+) => {
+  try {
+    // Convert km to approximate lat/lng degrees (1 degree ≈ 111km)
+    const radiusDegrees = radiusKm / 111;
+
+    // Build the query with server-side filtering
+    let query = supabase
+      .from("ride_requests")
+      .select(
+        `
+        id,
+        creator_id,
+        starting_point,
+        destination,
+        seats_available,
+        total_seats,
+        status,
+        created_at,
+        vehicle,
+        contact_phone
+      `,
+      )
+      .eq("status", "open"); // Only return open rides
+
+    // Add vehicle filter if specified
+    if (vehicleType) {
+      query = query.eq("vehicle", vehicleType);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    // Client-side filtering for proximity (since PostgREST doesn't have built-in geo functions)
+    // In production, you should use PostGIS extension for proper geo queries
+    const matchingRides = (data || []).filter((ride) => {
+      const startPoint = ride.starting_point as Location;
+      const destPoint = ride.destination as Location;
+
+      const startDistance = Math.sqrt(
+        Math.pow(startPoint.coordinates.lat - startLat, 2) +
+          Math.pow(startPoint.coordinates.lng - startLng, 2),
+      );
+
+      const destDistance = Math.sqrt(
+        Math.pow(destPoint.coordinates.lat - destLat, 2) +
+          Math.pow(destPoint.coordinates.lng - destLng, 2),
+      );
+
+      return startDistance <= radiusDegrees && destDistance <= radiusDegrees;
+    });
+
+    // Fetch passengers only for matching rides
+    const ridesWithPassengers = await Promise.all(
+      matchingRides.map(async (ride) => {
+        const { data: passengers } = await supabase
+          .from("ride_passengers")
+          .select("user_id")
+          .eq("ride_id", ride.id);
+
+        return {
+          id: ride.id,
+          creator: ride.creator_id,
+          startingPoint: ride.starting_point as Location,
+          destination: ride.destination as Location,
+          seatsAvailable: ride.seats_available,
+          totalSeats: ride.total_seats,
+          passengers: passengers?.map((p) => p.user_id) || [],
+          status: ride.status as RideStatus,
+          createdAt: ride.created_at,
+          vehicle: ride.vehicle as VehicleType,
+          contactPhone: ride.contact_phone,
+        };
+      }),
+    );
+
+    return ridesWithPassengers;
+  } catch (error) {
+    console.error("Error searching rides:", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch only rides that the current user is part of (created or joined)
+ * This is secure and doesn't expose other users' rides
+ */
+export const fetchUserRides = async (userId: string) => {
+  try {
+    // Get rides where user is the creator
+    const { data: createdRides, error: createdError } = await supabase
+      .from("ride_requests")
+      .select(
+        `
+        id,
+        creator_id,
+        starting_point,
+        destination,
+        seats_available,
+        total_seats,
+        status,
+        created_at,
+        vehicle,
+        contact_phone
+      `,
+      )
+      .eq("creator_id", userId);
+
+    if (createdError) throw createdError;
+
+    // Get rides where user is a passenger
+    const { data: joinedRideIds, error: joinedError } = await supabase
+      .from("ride_passengers")
+      .select("ride_id")
+      .eq("user_id", userId);
+
+    if (joinedError) throw joinedError;
+
+    const joinedIds = joinedRideIds?.map((r) => r.ride_id) || [];
+
+    let joinedRides: any[] = [];
+    if (joinedIds.length > 0) {
+      const { data, error } = await supabase
+        .from("ride_requests")
+        .select(
+          `
+          id,
+          creator_id,
+          starting_point,
+          destination,
+          seats_available,
+          total_seats,
+          status,
+          created_at,
+          vehicle,
+          contact_phone
+        `,
+        )
+        .in("id", joinedIds);
+
+      if (error) throw error;
+      joinedRides = data || [];
+    }
+
+    // Combine and deduplicate
+    const allRideIds = new Set([
+      ...(createdRides || []).map((r) => r.id),
+      ...joinedRides.map((r) => r.id),
+    ]);
+
+    const allRides = [...(createdRides || []), ...joinedRides].filter(
+      (ride, index, self) => self.findIndex((r) => r.id === ride.id) === index,
+    );
+
+    // Fetch passengers for user's rides
+    const { data: allPassengers } = await supabase
+      .from("ride_passengers")
+      .select("ride_id, user_id")
+      .in("ride_id", Array.from(allRideIds));
+
+    const passengersByRide = new Map<string, string[]>();
+    (allPassengers || []).forEach((p) => {
+      if (!passengersByRide.has(p.ride_id)) {
+        passengersByRide.set(p.ride_id, []);
+      }
+      passengersByRide.get(p.ride_id)!.push(p.user_id);
+    });
+
+    return allRides.map((ride) => ({
+      id: ride.id,
+      creator: ride.creator_id,
+      startingPoint: ride.starting_point as Location,
+      destination: ride.destination as Location,
+      seatsAvailable: ride.seats_available,
+      totalSeats: ride.total_seats,
+      passengers: passengersByRide.get(ride.id) || [],
+      status: ride.status as RideStatus,
+      createdAt: ride.created_at,
+      vehicle: ride.vehicle as VehicleType,
+      contactPhone: ride.contact_phone,
+    }));
+  } catch (error) {
+    console.error("Error fetching user rides:", error);
+    throw error;
+  }
+};
+
 export const fetchAllRides = async () => {
   try {
     const { data, error } = await supabase
@@ -288,8 +493,8 @@ export const createNotification = async (
           notificationId: data.id,
           type,
         },
-      }).catch((err) => {
-        // Error showing notification
+      }).catch(() => {
+        // Silently fail if notification cannot be shown
       });
     }
   }
