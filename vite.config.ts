@@ -21,16 +21,16 @@ export default defineConfig({
         start_url: "/",
         icons: [
           {
-            src: "/sohojatra_ico.png",
-            sizes: "192x192",
+            src: "/sohojatra.png",
+            sizes: "200x200",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
           },
           {
             src: "/sohojatra.png",
-            sizes: "512x512",
+            sizes: "200x200",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "maskable",
           },
         ],
       },
