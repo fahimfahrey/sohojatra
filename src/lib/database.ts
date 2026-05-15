@@ -110,7 +110,10 @@ export const searchRidesByRoute = async (
 
 /**
  * Fetch only rides that the current user is part of (created or joined)
- * This is secure and doesn't expose other users' rides
+ * IMPORTANT: This still returns full ride details for security reasons:
+ * - If user created the ride, they need all passenger info
+ * - If user joined the ride, they need contact info to coordinate
+ * This is intentional - users in the same ride need to contact each other
  */
 export const fetchUserRides = async (userId: string) => {
   try {
