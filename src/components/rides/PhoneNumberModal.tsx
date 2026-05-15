@@ -16,24 +16,50 @@ const PhoneNumberModal: React.FC<PhoneNumberModalProps> = ({
   const [phoneNumber, setPhoneNumber] = useState("");
   const [error, setError] = useState("");
 
+  // Validate phone number format
+  const validatePhoneNumber = (phone: string): boolean => {
+    // Remove common separators
+    const cleaned = phone.replace(/[\s\-\(\)\.]/g, "");
+
+    // Check length (10-15 digits)
+    if (cleaned.length < 10 || cleaned.length > 15) {
+      return false;
+    }
+
+    // Check if only digits and optional leading +
+    const phoneRegex = /^\+?[0-9]{10,15}$/;
+    return phoneRegex.test(cleaned);
+  };
+
+  // Sanitize phone number
+  const sanitizePhoneNumber = (phone: string): string => {
+    // Remove all non-digit characters except leading +
+    return phone.replace(/[^\d+]/g, "").slice(0, 20);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic validation
-    if (!phoneNumber.trim()) {
+    // Trim whitespace
+    const trimmedPhone = phoneNumber.trim();
+
+    // Check if empty
+    if (!trimmedPhone) {
       setError("Phone number is required");
       return;
     }
 
-    // Simple phone number format validation
-    const phoneRegex = /^\+?[0-9]{10,15}$/;
-    if (!phoneRegex.test(phoneNumber.replace(/\s|-/g, ""))) {
-      setError("Please enter a valid phone number");
+    // Validate format
+    if (!validatePhoneNumber(trimmedPhone)) {
+      setError("Please enter a valid phone number (10-15 digits)");
       return;
     }
 
+    // Sanitize before submission
+    const sanitized = sanitizePhoneNumber(trimmedPhone);
+
     setError("");
-    onSubmit(phoneNumber);
+    onSubmit(sanitized);
     setPhoneNumber("");
   };
 
@@ -41,7 +67,10 @@ const PhoneNumberModal: React.FC<PhoneNumberModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title="Contact Information">
       <form onSubmit={handleSubmit}>
         <div className="mb-4 sm:mb-6">
-          <label htmlFor="phone" className="block text-sm sm:text-base font-semibold text-gray-700 mb-2 sm:mb-3">
+          <label
+            htmlFor="phone"
+            className="block text-sm sm:text-base font-semibold text-gray-700 mb-2 sm:mb-3"
+          >
             Your Phone Number
           </label>
           <div className="relative">
@@ -55,14 +84,19 @@ const PhoneNumberModal: React.FC<PhoneNumberModalProps> = ({
               placeholder="+1234567890"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
+              maxLength={20}
               required
             />
           </div>
-          {error && <p className="mt-2 text-xs sm:text-sm text-red-600">{error}</p>}
+          {error && (
+            <p className="mt-2 text-xs sm:text-sm text-red-600">{error}</p>
+          )}
 
           <div className="mt-2 sm:mt-3 p-3 sm:p-4 bg-blue-50 rounded-lg sm:rounded-xl border border-blue-200">
             <p className="text-xs sm:text-sm text-blue-700">
-              <strong>📱 Why we need this:</strong> Your phone number will be shared with other passengers once they join your ride, making it easy to coordinate meeting points and timing.
+              <strong>📱 Why we need this:</strong> Your phone number will be
+              shared with other passengers once they join your ride, making it
+              easy to coordinate meeting points and timing.
             </p>
           </div>
         </div>
@@ -78,7 +112,7 @@ const PhoneNumberModal: React.FC<PhoneNumberModalProps> = ({
           <button
             type="submit"
             onClick={() => {
-             window.scrollTo({ top: 0, behavior: "smooth" });
+              window.scrollTo({ top: 0, behavior: "smooth" });
             }}
             className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white font-semibold rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-105 shadow-medium focus:outline-none focus:ring-2 focus:ring-accent-400 text-sm sm:text-base"
           >

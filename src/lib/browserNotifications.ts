@@ -3,7 +3,7 @@
 // Check if the device is a mobile device
 export const isMobileDevice = (): boolean => {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent
+    navigator.userAgent,
   );
 };
 
@@ -28,7 +28,6 @@ export const isNotificationSupported = (): boolean => {
 // Function to request notification permission
 export const requestNotificationPermission = async (): Promise<boolean> => {
   if (!isNotificationSupported()) {
-    console.log("Notifications not supported on this device/browser");
     return false;
   }
 
@@ -41,7 +40,6 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
       const permission = await Notification.requestPermission();
       return permission === "granted";
     } catch (error) {
-      console.error("Error requesting notification permission:", error);
       return false;
     }
   }
@@ -56,7 +54,6 @@ export const isServiceWorkerRegistered = async (): Promise<boolean> => {
       const registrations = await navigator.serviceWorker.getRegistrations();
       return registrations.length > 0;
     } catch (error) {
-      console.error("Error checking service worker registrations:", error);
       return false;
     }
   }
@@ -69,13 +66,10 @@ export const registerServiceWorker =
     if ("serviceWorker" in navigator) {
       try {
         const registration = await navigator.serviceWorker.register("/sw.js");
-        console.log("Service worker registration successful:", registration);
         return registration;
       } catch (error) {
-        console.error("Service worker registration failed:", error);
+        // Service worker registration failed
       }
-    } else {
-      console.log("Service workers not supported");
     }
     return null;
   };
@@ -89,7 +83,7 @@ export const showBrowserNotification = async (
     requireInteraction?: boolean;
     actions?: { action: string; title: string; deepLink?: string }[];
     data?: { redirectPath?: string; [key: string]: any };
-  }
+  },
 ): Promise<boolean> => {
   // First check if we're on a mobile device
   const isMobile = isMobileDevice();
@@ -97,16 +91,12 @@ export const showBrowserNotification = async (
   // For iOS devices, we might need a different approach as web notifications
   // are limited on iOS (only Safari 16.4+ supports, with limitations)
   if (isMobile && !isNotificationSupported()) {
-    console.log(
-      "Browser notifications not fully supported on this mobile device"
-    );
     return false;
   }
 
   // Check and request permission if needed
   const hasPermission = await requestNotificationPermission();
   if (!hasPermission) {
-    console.log("Notification permission not granted");
     return false;
   }
 
@@ -123,13 +113,11 @@ export const showBrowserNotification = async (
         swRegistration = await registerServiceWorker();
       }
     } catch (error) {
-      console.error("Error with service worker registration:", error);
       return false;
     }
   }
 
   if (!swRegistration) {
-    console.error("Service worker not available");
     return false;
   }
 
@@ -155,7 +143,6 @@ export const showBrowserNotification = async (
     }
     return true;
   } catch (error) {
-    console.error("Error showing notification:", error);
     return false;
   }
 };

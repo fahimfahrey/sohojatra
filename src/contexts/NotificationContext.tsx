@@ -48,14 +48,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       const supported = isNotificationSupported();
 
       setIsDeviceMobile(mobile);
-      setAreNotificationsSupported(supported);
-
-      console.log(
-        `Device is${mobile ? "" : " not"} mobile, notifications ${
-          supported ? "are" : "are not"
-        } supported`
-      );
-    }
+      setAreNotificationsSupported(supported);    }
   }, []);
 
   // Initialize service worker and request notification permission
@@ -93,9 +86,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
 
-        if (error) {
-          console.error("Error fetching notifications:", error);
-          return;
+        if (error) {          return;
         }
 
         if (data) {
@@ -112,9 +103,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
           setNotifications(transformedNotifications);
         }
-      } catch (error) {
-        console.error("Error in notification fetching process:", error);
-      }
+      } catch (error) {      }
     };
 
     fetchNotifications();
@@ -147,8 +136,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const handleRideUpdate = (message: { data: Record<string, unknown> }) => {
       const data = message.data as RideRequest;
-      console.log("Received ride update event:", data.status, data);
-
       // Check if the user is part of this ride
       if (data.creator === user.id || data.passengers.includes(user.id)) {
         let notificationMessage = "";
@@ -160,13 +147,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           notificationMessage = `Your ride to ${data.destination.address} has been cancelled.`;
         } else {
           notificationMessage = `Ride to ${data.destination.address} has been updated.`;
-        }
-
-        console.log(
-          "Adding notification for ride update:",
-          notificationMessage
-        );
-        addNotification(notificationMessage, "update", data.id);
+        }        addNotification(notificationMessage, "update", data.id);
       }
     };
 
@@ -234,14 +215,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         .select()
         .single();
 
-      if (error) {
-        console.error("Error adding notification:", error);
-        return;
+      if (error) {        return;
       }
 
-      if (!data) {
-        console.error("No data returned when adding notification");
-        return;
+      if (!data) {        return;
       }
 
       // Create notification object for the client
@@ -299,13 +276,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
             notificationId: data.id,
             type,
           },
-        }).catch((err) => {
-          console.error("Failed to show browser notification:", err);
-        });
+        }).catch((err) => {        });
       }
-    } catch (error) {
-      console.error("Error adding notification:", error);
-    }
+    } catch (error) {    }
   };
 
   const markAsRead = async (id: string) => {
@@ -314,9 +287,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       // Make sure the notification exists and belongs to the user
       const notificationToUpdate = notifications.find((n) => n.id === id);
-      if (!notificationToUpdate || notificationToUpdate.userId !== user.id) {
-        console.error("Notification not found or doesn't belong to the user");
-        return;
+      if (!notificationToUpdate || notificationToUpdate.userId !== user.id) {        return;
       }
 
       // Get the full notification data to preserve all fields
@@ -326,9 +297,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("id", id)
         .single();
 
-      if (fetchError) {
-        console.error("Error fetching notification:", fetchError);
-        return;
+      if (fetchError) {        return;
       }
 
       // Update the notification preserving all fields
@@ -337,9 +306,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         read: true,
       });
 
-      if (error) {
-        console.error("Error marking notification as read:", error);
-        return;
+      if (error) {        return;
       }
 
       // Update local state
@@ -350,9 +317,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
             : notification
         )
       );
-    } catch (error) {
-      console.error("Error marking notification as read:", error);
-    }
+    } catch (error) {    }
   };
 
   const markAllAsRead = async () => {
@@ -372,9 +337,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq("user_id", user.id)
         .eq("read", false);
 
-      if (fetchError) {
-        console.error("Error fetching unread notifications:", fetchError);
-        return;
+      if (fetchError) {        return;
       }
 
       if (!unreadNotifications || unreadNotifications.length === 0) {
@@ -389,18 +352,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const { error } = await supabase.from("notifications").upsert(updates);
 
-      if (error) {
-        console.error("Error marking all notifications as read:", error);
-        return;
+      if (error) {        return;
       }
 
       // Update local state
       setNotifications((prev) =>
         prev.map((notification) => ({ ...notification, read: true }))
       );
-    } catch (error) {
-      console.error("Error marking all notifications as read:", error);
-    }
+    } catch (error) {    }
   };
 
   return (

@@ -43,24 +43,11 @@ const NotificationInitializer: React.FC = () => {
               // For mobile, we might use a more cautious approach
               try {
                 await registerServiceWorker();
-              } catch (mobileError) {
-                console.warn(
-                  "Mobile service worker registration failed, continuing without it:",
-                  mobileError
-                );
-              }
+              } catch (mobileError) {              }
             }
-          } else {
-            console.log(
-              "Notifications not supported on this device/browser - skipping initialization"
-            );
-          }
+          } else {          }
 
-          setInitialized(true);
-          console.log("Notification system initialization attempted");
-        } catch (error) {
-          console.error("Failed to initialize notification system:", error);
-          // Still mark as initialized to prevent endless retries
+          setInitialized(true);        } catch (error) {          // Still mark as initialized to prevent endless retries
           setInitialized(true);
         }
       }
