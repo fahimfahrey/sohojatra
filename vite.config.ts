@@ -27,13 +27,13 @@ export default defineConfig({
         icons: [
           {
             src: "/sohojatra-splash.png",
-            sizes: "200x200",
+            sizes: "100x100",
             type: "image/png",
             purpose: "any",
           },
           {
             src: "/sohojatra-splash.png",
-            sizes: "200x200",
+            sizes: "100x100",
             type: "image/png",
             purpose: "maskable",
           },
