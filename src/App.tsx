@@ -14,6 +14,8 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import { AblyProvider } from "./contexts/AblyContext";
 import NotificationInitializer from "./components/NotificationInitializer";
 import FloatingCallButton from "./components/layout/FloatingCallButton";
+import { PWAInstallPrompt } from "./components/shared/PWAInstallPrompt";
+import { PWAStatus } from "./components/shared/PWAStatus";
 
 // Pages
 import HomePage from "./pages/HomePage";
@@ -106,11 +108,11 @@ function App() {
                         if (deltaX > 80) {
                           document.removeEventListener(
                             "touchmove",
-                            handleTouchMove
+                            handleTouchMove,
                           );
                           document.removeEventListener(
                             "touchend",
-                            handleTouchEnd
+                            handleTouchEnd,
                           );
                           toast.dismiss(t.id);
                         }
@@ -119,11 +121,11 @@ function App() {
                       const handleTouchEnd = () => {
                         document.removeEventListener(
                           "touchmove",
-                          handleTouchMove
+                          handleTouchMove,
                         );
                         document.removeEventListener(
                           "touchend",
-                          handleTouchEnd
+                          handleTouchEnd,
                         );
                       };
 
@@ -189,6 +191,12 @@ function App() {
 
               {/* Global floating call button */}
               <FloatingCallButton />
+
+              {/* PWA Install Prompt */}
+              <PWAInstallPrompt />
+
+              {/* PWA Status Indicator */}
+              <PWAStatus />
             </NotificationProvider>
           </RideProvider>
         </AblyProvider>
