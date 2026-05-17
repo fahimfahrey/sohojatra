@@ -7,12 +7,18 @@ export const metadata: Metadata = {
   title: "Login",
 };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Header />
       <main className="flex-grow flex items-center py-8 px-4">
-        <LoginForm />
+        <LoginForm nextPath={next} />
       </main>
       <Footer />
     </div>

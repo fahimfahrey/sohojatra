@@ -35,13 +35,13 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/register") ||
     pathname.startsWith("/auth");
 
-  const protectedPrefixes = [
-    "/dashboard",
-    "/create-ride",
-    "/rides",
-    "/email-confirmation",
-  ];
-  const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p));
+  const isRideDetailPage = /^\/rides\/[^/]+$/.test(pathname);
+
+  const isProtected =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/create-ride") ||
+    pathname === "/rides" ||
+    pathname.startsWith("/email-confirmation");
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
@@ -59,6 +59,7 @@ export async function updateSession(request: NextRequest) {
   if (
     user &&
     isProtected &&
+    !isRideDetailPage &&
     pathname !== "/email-confirmation" &&
     !user.email_confirmed_at
   ) {

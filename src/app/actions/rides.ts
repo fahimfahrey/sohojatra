@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/require-user";
+import { getOptionalUser, requireUser } from "@/lib/auth/require-user";
 import {
   createRideSchema,
   joinRideSchema,
@@ -64,7 +64,7 @@ export async function getRideByIdAction(
   rideId: string,
 ): Promise<ActionResult<RideRequest>> {
   try {
-    const user = await requireUser();
+    const user = await getOptionalUser();
     const parsed = rideIdSchema.safeParse({ rideId });
     if (!parsed.success) {
       return { success: false, error: "Invalid ride" };
@@ -74,7 +74,7 @@ export async function getRideByIdAction(
     const ride = await fetchRideByIdServer(
       supabase,
       parsed.data.rideId,
-      user.id,
+      user?.id ?? null,
     );
 
     if (!ride) {

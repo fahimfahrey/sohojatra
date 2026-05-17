@@ -149,7 +149,7 @@ export async function searchRidesByRouteServer(
 export async function fetchRideByIdServer(
   supabase: SupabaseClient,
   rideId: string,
-  userId: string,
+  userId: string | null,
 ): Promise<RideRequest | null> {
   const { data: ride, error } = await supabase
     .from("ride_requests")
@@ -168,7 +168,8 @@ export async function fetchRideByIdServer(
 
   const passengerIds = passengers?.map((p) => p.user_id) ?? [];
   const isParticipant =
-    ride.creator_id === userId || passengerIds.includes(userId);
+    !!userId &&
+    (ride.creator_id === userId || passengerIds.includes(userId));
 
   if (!isParticipant && ride.status === "open") {
     return {

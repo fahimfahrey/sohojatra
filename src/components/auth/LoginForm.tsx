@@ -8,7 +8,7 @@ import type { ActionResult } from "@/lib/validation/schemas";
 
 const initialState: ActionResult | null = null;
 
-export default function LoginForm() {
+export default function LoginForm({ nextPath }: { nextPath?: string }) {
   const [state, formAction, pending] = useActionState(signInAction, initialState);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -41,6 +41,7 @@ export default function LoginForm() {
         </div>
 
         <form action={formAction} className="space-y-5">
+          {nextPath ? <input type="hidden" name="next" value={nextPath} /> : null}
           {state && !state.success && (
             <p
               className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3"
