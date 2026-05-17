@@ -11,6 +11,13 @@ import {
   type ActionResult,
 } from "@/lib/validation/schemas";
 
+function safeRedirectPath(next: string | null | undefined): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) {
+    return "/dashboard";
+  }
+  return next;
+}
+
 async function getClientIp(): Promise<string> {
   const headersList = await headers();
   return (
@@ -77,7 +84,7 @@ export async function signInAction(
 
   await ensureUserProfile(data.user.id, parsed.data.email, userName);
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  redirect(safeRedirectPath(formData.get("next")?.toString()));
 }
 
 export async function signUpAction(

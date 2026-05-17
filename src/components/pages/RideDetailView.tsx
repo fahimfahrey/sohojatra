@@ -8,9 +8,11 @@ import RideDetail from "@/components/rides/RideDetail";
 import { getRideByIdAction } from "@/app/actions/rides";
 import { useRide } from "@/contexts/RideContext";
 import { useAbly } from "@/contexts/AblyContext";
+import { useAuth } from "@/contexts/AuthContext";
 import type { RideRequest } from "@/types";
 
 export default function RideDetailView({ rideId }: { rideId: string }) {
+  const { user } = useAuth();
   const { rides } = useRide();
   const { subscribeToEvent } = useAbly();
   const [ride, setRide] = useState<RideRequest | null>(
@@ -38,12 +40,13 @@ export default function RideDetailView({ rideId }: { rideId: string }) {
   }, [rides, rideId]);
 
   useEffect(() => {
+    if (!user) return;
     return subscribeToEvent("rides", "sync", () => {
       getRideByIdAction(rideId).then((result) => {
         if (result.success && result.data) setRide(result.data);
       });
     });
-  }, [rideId, subscribeToEvent]);
+  }, [rideId, subscribeToEvent, user]);
 
   if (loading) {
     return (
