@@ -46,8 +46,22 @@ export function AblyProvider({ children }: { children: ReactNode }) {
     }
 
     ablyInstance = new Ably.Realtime({
-      authUrl: "/api/ably/token",
       clientId: user.id,
+      authCallback: (_tokenParams, callback) => {
+        fetch("/api/ably/token", { credentials: "include" })
+          .then(async (res) => {
+            if (!res.ok) {
+              const body = await res.text();
+              callback(
+                body || `Token request failed (${res.status})`,
+                null,
+              );
+              return;
+            }
+            callback(null, await res.json());
+          })
+          .catch((err: Error) => callback(err.message, null));
+      },
       autoConnect: true,
     });
 
