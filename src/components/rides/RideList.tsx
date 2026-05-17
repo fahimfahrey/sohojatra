@@ -1,9 +1,11 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { RideRequest } from "../../types";
 import RideCard from "./RideCard";
 import { useRide } from "../../contexts/RideContext";
 import { toast } from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import { useNotification } from "../../contexts/NotificationContext";
 import PhoneNumberModal from "./PhoneNumberModal";
 
@@ -30,7 +32,7 @@ const RideList: React.FC<RideListProps> = ({
     completeRideRequest,
     syncRideStatus,
   } = useRide();
-  const navigate = useNavigate();
+  const router = useRouter();
   const { addNotification } = useNotification();
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
@@ -100,7 +102,7 @@ const RideList: React.FC<RideListProps> = ({
       toast.success("Successfully joined the ride");
 
       // Redirect to the ride details page
-      navigate(`/rides/${selectedRideId}`);
+      router.push(`/rides/${selectedRideId}`);
     } catch (error) {
       toast.error("Failed to join ride");
       console.error(error);

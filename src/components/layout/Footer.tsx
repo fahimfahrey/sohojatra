@@ -1,11 +1,12 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { Github, Linkedin } from "lucide-react";
-import Logo from "/sohojatra.png";
-import TermsModal from "../modals/TermsModal";
-import PrivacyModal from "../modals/PrivacyModal";
+"use client";
 
-const Footer: React.FC = () => {
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import TermsModal from "@/components/modals/TermsModal";
+import PrivacyModal from "@/components/modals/PrivacyModal";
+
+export default function Footer() {
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
@@ -13,131 +14,84 @@ const Footer: React.FC = () => {
     <footer className="bg-gradient-to-r from-accent-600 to-secondary-600 text-white">
       <div className="container mx-auto px-4 py-8 sm:py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-          <div className="sm:col-span-2 lg:col-span-2">
-            <img
-              src={Logo}
+          <div className="sm:col-span-2">
+            <Image
+              src="/sohojatra.png"
               alt="Sohojatra"
-              className="w-[140px] sm:w-[160px] lg:w-[180px] mb-4"
+              width={180}
+              height={56}
+              className="w-[140px] sm:w-[160px] mb-4 h-auto"
             />
-            <p className="text-white/80 text-base sm:text-lg leading-relaxed max-w-md">
+            <p className="text-white/80 text-sm sm:text-base leading-relaxed max-w-md">
               Connecting passengers to share rides and reduce transportation
-              costs. Our platform makes sharing rides easy, environmentally
-              friendly, and economical.
+              costs across Bangladesh.
             </p>
           </div>
 
-          <div className="sm:col-span-1">
-            <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6">Quick Links</h3>
-            <ul className="space-y-2 sm:space-y-3">
+          <div>
+            <h3 className="text-lg font-bold mb-4">Quick Links</h3>
+            <ul className="space-y-2 text-sm sm:text-base">
               <li>
-                <Link
-                  to="/"
-                  onClick={() => {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  className="text-white/80 hover:text-white transition-colors text-base sm:text-lg hover:translate-x-1 transform duration-200 inline-block"
-                >
+                <Link href="/" className="text-white/80 hover:text-white">
                   Home
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/rides"
-                  onClick={() => {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  className="text-white/80 hover:text-white transition-colors text-base sm:text-lg hover:translate-x-1 transform duration-200 inline-block"
-                >
+                <Link href="/rides" className="text-white/80 hover:text-white">
                   Find Rides
                 </Link>
               </li>
               <li>
                 <Link
-                  to="/create-ride"
-                  onClick={() => {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  className="text-white/80 hover:text-white transition-colors text-base sm:text-lg hover:translate-x-1 transform duration-200 inline-block"
+                  href="/create-ride"
+                  className="text-white/80 hover:text-white"
                 >
                   Create Ride
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/"
-                  onClick={() => {
-                    window.scrollTo({ top: 300, behavior: "smooth" });
-                  }}
-                  className="text-white/80 hover:text-white transition-colors text-base sm:text-lg hover:translate-x-1 transform duration-200 inline-block"
-                >
-                  How It Works
                 </Link>
               </li>
             </ul>
           </div>
 
-          <div className="sm:col-span-1">
-            <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6">Support & Legal</h3>
-            <ul className="space-y-2 sm:space-y-3 mb-6 sm:mb-8">
+          <div>
+            <h3 className="text-lg font-bold mb-4">Support & Legal</h3>
+            <ul className="space-y-2 text-sm sm:text-base mb-6">
               <li>
-                <Link
-                  to="https://www.linkedin.com/in/muhammad-faahem/"
+                <a
+                  href="https://www.linkedin.com/in/muhammad-faahem/"
                   target="_blank"
-                  className="text-white/80 hover:text-white transition-colors text-base sm:text-lg hover:translate-x-1 transform duration-200 inline-block"
+                  rel="noopener noreferrer"
+                  className="text-white/80 hover:text-white"
                 >
                   Contact Us
-                </Link>
+                </a>
               </li>
               <li>
                 <button
+                  type="button"
                   onClick={() => setIsTermsModalOpen(true)}
-                  className="text-white/80 hover:text-white transition-colors text-base sm:text-lg cursor-pointer hover:translate-x-1 transform duration-200 inline-block text-left"
+                  className="text-white/80 hover:text-white text-left"
                 >
                   Terms of Service
                 </button>
               </li>
               <li>
                 <button
+                  type="button"
                   onClick={() => setIsPrivacyModalOpen(true)}
-                  className="text-white/80 hover:text-white transition-colors text-base sm:text-lg cursor-pointer hover:translate-x-1 transform duration-200 inline-block text-left"
+                  className="text-white/80 hover:text-white text-left"
                 >
                   Privacy Policy
                 </button>
               </li>
             </ul>
-
-            <div>
-              <h4 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Follow Us</h4>
-              <div className="flex space-x-3 sm:space-x-4">
-                <a
-                  href="https://github.com/MehmetFaahem"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 sm:p-3 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all duration-200 transform hover:scale-110"
-                >
-                  <Github size={20} className="sm:w-6 sm:h-6" />
-                </a>
-                <a
-                  href="https://www.linkedin.com/in/muhammad-faahem/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 sm:p-3 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all duration-200 transform hover:scale-110"
-                >
-                  <Linkedin size={20} className="sm:w-6 sm:h-6" />
-                </a>
-              </div>
-            </div>
           </div>
         </div>
 
-        <div className="border-t border-white/20 mt-8 sm:mt-12 pt-6 sm:pt-8 text-center">
-          <p className="text-white/70 text-sm sm:text-base lg:text-lg">
-            &copy; {new Date().getFullYear()} Sohojatra. All rights reserved. Made with ❤️ for smarter commuting.
-          </p>
+        <div className="border-t border-white/20 mt-8 pt-6 text-center text-white/70 text-sm">
+          &copy; {new Date().getFullYear()} Sohojatra. All rights reserved.
         </div>
       </div>
 
-      {/* Modals */}
       <TermsModal
         isOpen={isTermsModalOpen}
         onClose={() => setIsTermsModalOpen(false)}
@@ -148,6 +102,4 @@ const Footer: React.FC = () => {
       />
     </footer>
   );
-};
-
-export default Footer;
+}

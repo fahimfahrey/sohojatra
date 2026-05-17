@@ -1,10 +1,12 @@
+"use client";
+
 import React, { useEffect, useState, useCallback } from "react";
 import { Phone } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRide } from "../../contexts/RideContext";
 import { useAbly } from "../../contexts/AblyContext";
 import { toast } from "react-hot-toast";
-import { supabase } from "../../lib/supabase";
+import { getCreatorPhoneAction } from "@/app/actions/rides";
 
 // Set to true to show the button for debugging
 const DEBUG_MODE = false; // Temporarily set to true for debugging
@@ -102,7 +104,7 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
       } else {
         // Otherwise, fetch from database
         addDebugInfo(`No phone on ride object, fetching from database`);
-        const phone = await fetchCreatorPhone(ride.id, ride.creator);
+        const phone = await fetchCreatorPhone(ride.id);
         if (phone) {
           addDebugInfo(`Found phone in database: ${phone}`);
           phoneToUse = phone;
@@ -245,28 +247,20 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
     }
   }, [user, rides]);
 
-  // Fetch creator phone number directly from supabase
-  const fetchCreatorPhone = async (rideId: string, creatorId: string) => {
+  const fetchCreatorPhone = async (targetRideId: string) => {
     try {
       addDebugInfo(
-        `Fetching creator phone for ride ${rideId}, creator ${creatorId}`,
+        `Fetching creator phone via server action for ride ${targetRideId}`,
       );
-      const { data, error } = await supabase
-        .from("ride_passengers")
-        .select("contact_phone")
-        .eq("ride_id", rideId)
-        .eq("user_id", creatorId)
-        .single();
+      const result = await getCreatorPhoneAction(targetRideId);
 
-      if (error || !data) {
-        addDebugInfo(
-          `Error fetching creator phone: ${error?.message || "No data"}`,
-        );
+      if (!result.success) {
+        addDebugInfo(`Server denied phone: ${result.error}`);
         return null;
       }
 
-      addDebugInfo(`Found creator phone: ${data.contact_phone || "none"}`);
-      return data.contact_phone;
+      addDebugInfo(`Found creator phone via server`);
+      return result.data?.phone ?? null;
     } catch (err) {
       addDebugInfo(`Exception fetching creator phone: ${err}`);
       return null;

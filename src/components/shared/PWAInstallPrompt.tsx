@@ -1,6 +1,8 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { Download, X } from "lucide-react";
-import { usePWAInstall } from "../../lib/pwa";
+import { usePWAInstall } from "@/lib/pwa";
 
 export const PWAInstallPrompt = () => {
   const { isInstallable, isInstalled, promptInstall } = usePWAInstall();

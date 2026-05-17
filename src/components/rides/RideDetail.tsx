@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useCallback } from "react";
 import { RideRequest } from "../../types";
 import { MapPin, Car, Navigation, Users, Calendar, User, Phone, Clock, CheckCircle } from "lucide-react";
@@ -5,7 +7,7 @@ import RideMap from "../map/RideMap";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRide } from "../../contexts/RideContext";
 import { toast } from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import { useNotification } from "../../contexts/NotificationContext";
 import PhoneNumberModal from "./PhoneNumberModal";
 import { supabase } from "../../lib/supabase";
@@ -42,7 +44,7 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
     syncRideStatus,
   } = useRide();
   const { addNotification } = useNotification();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [passengers, setPassengers] = useState<PassengerInfo[]>([]);
   const [isJoining] = useState(false);
@@ -192,7 +194,7 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
         ride.id
       );
       toast.success("Ride cancelled successfully");
-      navigate("/dashboard");
+      router.push("/dashboard");
       window.scrollTo({
         top: 0,
         behavior: "smooth",
@@ -216,7 +218,7 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
         ride.id
       );
       toast.success("Ride completed successfully");
-      navigate("/dashboard");
+      router.push("/dashboard");
       window.scrollTo({
         top: 0,
         behavior: "smooth",
@@ -483,7 +485,7 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
                   top: 0,
                   behavior: "smooth",
                 });
-                navigate(-1);
+                router.back();
               }}
               className="w-full sm:flex-1 border-2 border-gray-200 hover:border-accent-300 hover:bg-accent-50 text-gray-700 hover:text-accent-700 px-4 sm:px-6 py-3 rounded-lg sm:rounded-xl font-semibold transition-all duration-200 text-sm sm:text-base"
             >
