@@ -184,7 +184,6 @@ const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
 
   // Search for locations using OpenStreetMap Nominatim geocoding API
   const searchLocations = useCallback(async (searchQuery: string) => {
-    console.log("Searching for:", searchQuery);
     if (!searchQuery.trim()) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -200,7 +199,6 @@ const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
       );
 
       const data = await response.json();
-      console.log("Search results:", data);
 
       if (data && data.length > 0) {
         setSuggestions(data);
@@ -242,7 +240,6 @@ const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
-    console.log("Search input changed:", inputValue);
     setQuery(inputValue);
     
     if (inputValue.trim()) {
