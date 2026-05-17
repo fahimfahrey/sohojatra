@@ -56,7 +56,7 @@ const VehicleSelector: React.FC<VehicleSelectorProps> = ({
                     </span>
                     {!isFilter && (
                       <span className="text-xs text-gray-500">
-                        {option.bengaliName}
+                        {option.label}
                       </span>
                     )}
                   </div>
@@ -77,7 +77,7 @@ const VehicleSelector: React.FC<VehicleSelectorProps> = ({
                   <div className={`flex ${isFilter ? 'justify-center' : 'items-center justify-between'}`}>
                     {!isFilter && (
                       <span className="text-xs font-medium text-green-600">
-                        {option.estimatedCost}
+                        {option.description}
                       </span>
                     )}
                     {selectedVehicle === option.value && (

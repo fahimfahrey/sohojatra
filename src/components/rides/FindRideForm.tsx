@@ -3,7 +3,7 @@ import { useRide } from "../../contexts/RideContext";
 import { useAbly } from "../../contexts/AblyContext";
 import { Search, MapPin, Filter, Car, X } from "lucide-react";
 import { Location, RideRequest, VehicleType } from "../../types";
-import GlobalMap from "../map/GlobalMap";
+import GlobalMap from "../map/MapLoader";
 import RideList from "./RideList";
 import VehicleSelector from "./VehicleSelector";
 

@@ -81,9 +81,10 @@ export const registerNotificationServiceWorker =
   async (): Promise<ServiceWorkerRegistration | null> => {
     if ("serviceWorker" in navigator) {
       try {
-        const registration = await navigator.serviceWorker.register("/sw.js", {
-          scope: "/",
-        });
+        const registration = await navigator.serviceWorker.register(
+          "/serwist/sw.js",
+          { scope: "/" },
+        );
         console.log("Notification Service Worker registered:", registration);
         return registration;
       } catch (error) {

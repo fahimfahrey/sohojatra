@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   MapContainer,
@@ -73,7 +75,6 @@ const MapEvents = ({
   selectingLocation: "start" | "destination" | null;
   setLoading: (isLoading: boolean) => void;
 }) => {
-  // We don't need to store map as a variable if not used
   useMap();
 
   // Fix the debouncedGeocode function
@@ -135,6 +136,18 @@ const MapEvents = ({
 
   return null;
 };
+
+function MapRefBinder({
+  mapRef,
+}: {
+  mapRef: React.MutableRefObject<L.Map | null>;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    mapRef.current = map;
+  }, [map, mapRef]);
+  return null;
+}
 
 interface LocationSearchInputProps {
   placeholder: string;
@@ -664,12 +677,8 @@ const GlobalMap: React.FC<GlobalMapProps> = ({
           center={getCenterPosition()}
           zoom={13}
           style={{ height: "100%", width: "100%", borderRadius: "8px" }}
-          whenReady={(e: L.LeafletEvent) => {
-            if ('target' in e && e.target instanceof L.Map) {
-              mapRef.current = e.target;
-            }
-          }}
         >
+          <MapRefBinder mapRef={mapRef} />
           <MapTileLayers />
 
           <MapEvents

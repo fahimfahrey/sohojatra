@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { useNotification } from "../../contexts/NotificationContext";
 import { Bell, CheckCircle, Info, Users } from "lucide-react";
 import { requestNotificationPermission } from "../../lib/browserNotifications";
@@ -139,7 +139,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                     </div>
                     {notification.rideId && (
                       <Link
-                        to={`/rides/${notification.rideId}`}
+                        href={`/rides/${notification.rideId}`}
                         className="mt-2 text-xs text-accent-600 hover:text-accent-700 font-medium"
                         onClick={onClose}
                       >

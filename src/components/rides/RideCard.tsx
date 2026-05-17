@@ -1,7 +1,9 @@
+"use client";
+
 import React, { useCallback } from "react";
 import { RideRequest } from "../../types";
 import { MapPin, Navigation, Users, Calendar, Clock, Car } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface RideCardProps {
@@ -18,7 +20,7 @@ const RideCard: React.FC<RideCardProps> = ({
   onComplete,
 }) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   // User permissions
   const isCreator = user && ride.creator === user.id;
@@ -43,11 +45,11 @@ const RideCard: React.FC<RideCardProps> = ({
           if (onComplete) onComplete(ride.id);
           break;
         case "view":
-          navigate(`/rides/${ride.id}`);
+          router.push(`/rides/${ride.id}`);
           break;
       }
     },
-    [ride.id, onJoin, onCancel, onComplete, navigate]
+    [ride.id, onJoin, onCancel, onComplete, router]
   );
 
   const getStatusBadge = (status: string) => {

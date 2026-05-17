@@ -1,9 +1,11 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { useRide } from "../../contexts/RideContext";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Location, VehicleType } from "../../types";
-import GlobalMap from "../map/GlobalMap";
+import GlobalMap from "../map/MapLoader";
 import { useNotification } from "../../contexts/NotificationContext";
 import PhoneNumberModal from "./PhoneNumberModal";
 import VehicleSelector from "./VehicleSelector";
@@ -20,7 +22,7 @@ const CreateRideForm: React.FC = () => {
 
   const { createRideRequest } = useRide();
   const { addNotification } = useNotification();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   // Function to get available seat options based on vehicle type
   const getAvailableSeats = (vehicle: VehicleType): number[] => {
@@ -75,7 +77,7 @@ const CreateRideForm: React.FC = () => {
         "system",
         newRide.id
       );
-      navigate("/dashboard");
+      router.push("/dashboard");
     } catch (error) {
       toast.error("Failed to create ride request");
       console.error(error);

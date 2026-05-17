@@ -1,5 +1,28 @@
-# Logs
-logs
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# Production build
+build/
+dist/
+dist-ssr/
+dev-dist/
+
+# Serwist (generated at /serwist/sw.js via route handler — no public/sw.js)
+
+# Environment variables
+.env
+.env*.local
+!.env.example
+
+# Debug logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,30 +30,41 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Testing
+coverage/
+.nyc_output/
 
-# Editor directories and files
+# TypeScript
+*.tsbuildinfo
+
+# Caches
+.cache/
+.turbo/
+.eslintcache
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+!.vscode/settings.json.example
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-.env
 
-# Markdown files (except readme.md and PWA docs)
-*.md
-!readme.md
-!PWA_*.md
-!HOW_TO_INSTALL_PWA.md
+# Vercel
+.vercel
 
-# Supabase migrations
-supabase/
-*.sql
+# Supabase local
+.branches/
+.temp/
+
+# Misc
 todo
+*.pem

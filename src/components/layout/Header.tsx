@@ -1,6 +1,11 @@
+"use client";
+
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { signOutAction } from "@/app/actions/auth";
 import {
   Bell,
   Menu,
@@ -11,22 +16,21 @@ import {
   Info,
   Users,
 } from "lucide-react";
-import { useNotification } from "../../contexts/NotificationContext";
-import NotificationDropdown from "../shared/NotificationDropdown";
-import Logo from "/sohojatra.png";
+import { useNotification } from "@/contexts/NotificationContext";
+import NotificationDropdown from "@/components/shared/NotificationDropdown";
 
 const Header: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { unreadCount } = useNotification();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] =
     useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
+  const handleLogout = async () => {
+    await signOutAction();
+    router.push("/login");
   };
 
   return (
@@ -38,11 +42,14 @@ const Header: React.FC = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 sm:h-20">
             <div className="flex items-center">
-              <Link to="/" className="flex-shrink-0 flex items-center">
-                <img
-                  src={Logo}
+              <Link href="/" className="flex-shrink-0 flex items-center">
+                <Image
+                  src="/sohojatra.png"
                   alt="Sohojatra"
+                  width={150}
+                  height={48}
                   className="w-[100px] sm:w-[120px] md:w-[150px] h-auto"
+                  priority
                 />
               </Link>
             </div>
@@ -52,19 +59,19 @@ const Header: React.FC = () => {
               {user ? (
                 <>
                   <Link
-                    to="/dashboard"
+                    href="/dashboard"
                     className="px-3 xl:px-4 py-2 rounded-xl text-sm font-medium text-gray-700 hover:text-accent-600 hover:bg-accent-50 transition-all duration-200"
                   >
                     Dashboard
                   </Link>
                   <Link
-                    to="/rides"
+                    href="/rides"
                     className="px-3 xl:px-4 py-2 rounded-xl text-sm font-medium text-gray-700 hover:text-accent-600 hover:bg-accent-50 transition-all duration-200"
                   >
                     Find Rides
                   </Link>
                   <Link
-                    to="/create-ride"
+                    href="/create-ride"
                     className="px-3 xl:px-4 py-2 rounded-xl text-sm font-medium text-gray-700 hover:text-accent-600 hover:bg-accent-50 transition-all duration-200"
                   >
                     Create Ride
@@ -106,7 +113,7 @@ const Header: React.FC = () => {
               ) : (
                 <>
                   <Link
-                    to="/login"
+                    href="/login"
                     className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 hover:text-accent-600 hover:bg-accent-50 transition-all duration-200"
                     onClick={() => {
                       window.scrollTo({
@@ -118,7 +125,7 @@ const Header: React.FC = () => {
                     Log in
                   </Link>
                   <Link
-                    to="/register"
+                    href="/register"
                     className="px-4 py-2 bg-gradient-to-r from-accent-400 to-accent-500 hover:from-accent-500 hover:to-accent-600 text-white text-sm font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-medium"
                     onClick={() => {
                       window.scrollTo({
@@ -173,21 +180,21 @@ const Header: React.FC = () => {
               {user ? (
                 <>
                   <Link
-                    to="/dashboard"
+                    href="/dashboard"
                     className="block px-4 py-3 text-base font-medium text-gray-700 hover:text-accent-600 hover:bg-accent-50 rounded-xl transition-all duration-200"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Dashboard
                   </Link>
                   <Link
-                    to="/rides"
+                    href="/rides"
                     className="block px-4 py-3 text-base font-medium text-gray-700 hover:text-accent-600 hover:bg-accent-50 rounded-xl transition-all duration-200"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Find Rides
                   </Link>
                   <Link
-                    to="/create-ride"
+                    href="/create-ride"
                     className="block px-4 py-3 text-base font-medium text-gray-700 hover:text-accent-600 hover:bg-accent-50 rounded-xl transition-all duration-200"
                     onClick={() => setIsMenuOpen(false)}
                   >
@@ -216,7 +223,7 @@ const Header: React.FC = () => {
               ) : (
                 <>
                   <Link
-                    to="/login"
+                    href="/login"
                     className="block px-4 py-3 text-base font-medium text-gray-700 hover:text-accent-600 hover:bg-accent-50 rounded-xl transition-all duration-200"
                     onClick={() => {
                       setIsMenuOpen(false);
@@ -229,7 +236,7 @@ const Header: React.FC = () => {
                     Log in
                   </Link>
                   <Link
-                    to="/register"
+                    href="/register"
                     className="block px-4 py-3 text-base font-medium text-white bg-gradient-to-r from-accent-400 to-accent-500 hover:from-accent-500 hover:to-accent-600 rounded-xl transition-all duration-200 mt-2"
                     onClick={() => {
                       setIsMenuOpen(false);
