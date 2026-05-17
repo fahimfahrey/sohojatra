@@ -14,6 +14,11 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Location } from "../../types";
 import { MapPin, Navigation, X } from "lucide-react";
+import toast from "react-hot-toast";
+import {
+  geolocationFailureMessage,
+  requestCurrentPosition,
+} from "@/lib/geolocation";
 import MapTileLayers from "./MapTileLayers";
 
 // Fix the icon issue with Leaflet in React
@@ -419,27 +424,31 @@ const GlobalMap: React.FC<GlobalMapProps> = ({
     return location.address.split(',')[0].trim();
   };
 
-  // Get user's current location on component mount
+  // Center on user location when permission is already granted (no prompt on mount)
   useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newPosition: [number, number] = [
-            position.coords.latitude,
-            position.coords.longitude,
-          ];
-          setCurrentPosition(newPosition);
-
-          // If map is available, center it on user's location
-          if (mapRef.current) {
-            mapRef.current.setView(newPosition, 13);
-          }
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-        }
-      );
+    if (typeof navigator === "undefined" || !navigator.permissions?.query) {
+      return;
     }
+
+    navigator.permissions
+      .query({ name: "geolocation" })
+      .then((status) => {
+        if (status.state !== "granted") return;
+
+        return requestCurrentPosition({ maximumAge: 60_000, timeout: 10_000 });
+      })
+      .then((position) => {
+        if (!position) return;
+        const newPosition: [number, number] = [
+          position.coords.latitude,
+          position.coords.longitude,
+        ];
+        setCurrentPosition(newPosition);
+        mapRef.current?.setView(newPosition, 13);
+      })
+      .catch(() => {
+        // User denied or location unavailable — map defaults to Dhaka
+      });
   }, []);
 
   // Handle location selection (from search or map click)
@@ -550,28 +559,28 @@ const GlobalMap: React.FC<GlobalMapProps> = ({
 
   // Function to handle getting current location
   const handleGetCurrentLocation = () => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newPosition: [number, number] = [
-            position.coords.latitude,
-            position.coords.longitude,
-          ];
-          setCurrentPosition(newPosition);
-
-          // Center map on user's location
-          if (mapRef.current) {
-            mapRef.current.setView(newPosition, 15, {
-              animate: true,
-              duration: 1,
-            });
-          }
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-        }
-      );
-    }
+    requestCurrentPosition({ enableHighAccuracy: true, timeout: 15_000 })
+      .then((position) => {
+        const newPosition: [number, number] = [
+          position.coords.latitude,
+          position.coords.longitude,
+        ];
+        setCurrentPosition(newPosition);
+        mapRef.current?.setView(newPosition, 15, {
+          animate: true,
+          duration: 1,
+        });
+      })
+      .catch((err: Error & { reason?: string }) => {
+        const reason =
+          err.reason === "denied" ||
+          err.reason === "unavailable" ||
+          err.reason === "timeout" ||
+          err.reason === "unsupported"
+            ? err.reason
+            : "unavailable";
+        toast.error(geolocationFailureMessage(reason));
+      });
   };
 
   return (
