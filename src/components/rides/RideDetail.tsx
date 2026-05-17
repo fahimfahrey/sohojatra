@@ -3,14 +3,14 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { RideRequest } from "../../types";
 import { MapPin, Car, Navigation, Users, Calendar, User, Phone, Clock, CheckCircle } from "lucide-react";
-import RideMap from "../map/RideMap";
+import RideMap from "../map/RideMapLoader";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRide } from "../../contexts/RideContext";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useNotification } from "../../contexts/NotificationContext";
 import PhoneNumberModal from "./PhoneNumberModal";
-import { supabase } from "../../lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 interface RideDetailProps {
   ride: RideRequest;
@@ -70,6 +70,7 @@ const RideDetail: React.FC<RideDetailProps> = ({ ride }) => {
   // Fetch passengers info - memoized to avoid unnecessary rerenders
   const fetchPassengersInfo = useCallback(async () => {
     try {
+      const supabase = createClient();
       // Get passenger info including phone numbers
       const { data, error } = await supabase
         .from("ride_passengers")
