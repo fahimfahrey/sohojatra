@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { RideRequest, Location, VehicleType } from "@/types";
 import { useAuth } from "./AuthContext";
-import { useAbly } from "./AblyContext";
+import { RIDES_CHANNEL, useAbly } from "./AblyContext";
 import {
   getUserRidesAction,
   searchRidesAction,
@@ -65,7 +65,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) return;
-    const unsub = subscribeToEvent("rides", "sync", () => {
+    const unsub = subscribeToEvent(RIDES_CHANNEL, "sync", () => {
       refreshUserRides();
     });
     return unsub;
@@ -95,7 +95,10 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     await refreshUserRides();
     const created = rides.find((r) => r.id === result.data!.rideId);
     if (created) {
-      publishEvent("rides", "sync", { rideId: created.id, action: "create" });
+      publishEvent(RIDES_CHANNEL, "sync", {
+        rideId: created.id,
+        action: "create",
+      });
       return created;
     }
 
@@ -105,7 +108,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         ? refreshed.data.find((r) => r.id === result.data!.rideId)
         : undefined;
     if (!ride) throw new Error("Ride created but not found");
-    publishEvent("rides", "sync", { rideId: ride.id, action: "create" });
+    publishEvent(RIDES_CHANNEL, "sync", { rideId: ride.id, action: "create" });
     return ride;
   };
 
@@ -113,21 +116,21 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     const result = await joinRideAction({ rideId, contactPhone });
     if (!result.success) throw new Error(result.error);
     await refreshUserRides();
-    publishEvent("rides", "sync", { rideId, action: "join" });
+    publishEvent(RIDES_CHANNEL, "sync", { rideId, action: "join" });
   };
 
   const cancelRideRequest = async (rideId: string) => {
     const result = await cancelRideAction(rideId);
     if (!result.success) throw new Error(result.error);
     await refreshUserRides();
-    publishEvent("rides", "sync", { rideId, action: "cancel" });
+    publishEvent(RIDES_CHANNEL, "sync", { rideId, action: "cancel" });
   };
 
   const completeRideRequest = async (rideId: string) => {
     const result = await completeRideAction(rideId);
     if (!result.success) throw new Error(result.error);
     await refreshUserRides();
-    publishEvent("rides", "sync", { rideId, action: "complete" });
+    publishEvent(RIDES_CHANNEL, "sync", { rideId, action: "complete" });
   };
 
   const findMatchingRides = async (

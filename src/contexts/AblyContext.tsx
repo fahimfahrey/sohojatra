@@ -31,6 +31,9 @@ interface AblyContextType {
 
 const AblyContext = createContext<AblyContextType | undefined>(undefined);
 
+/** Channel used for ride list sync broadcasts */
+export const RIDES_CHANNEL = "rides";
+
 export function AblyProvider({ children }: { children: ReactNode }) {
   const [ably, setAbly] = useState<Ably.Realtime | null>(null);
   const [connected, setConnected] = useState(false);
@@ -47,6 +50,7 @@ export function AblyProvider({ children }: { children: ReactNode }) {
 
     ablyInstance = new Ably.Realtime({
       clientId: user.id,
+      transports: ["web_socket"],
       authCallback: (_tokenParams, callback) => {
         fetch("/api/ably/token", { credentials: "include" })
           .then(async (res) => {
@@ -65,13 +69,20 @@ export function AblyProvider({ children }: { children: ReactNode }) {
       autoConnect: true,
     });
 
-    ablyInstance.connection.on("connected", () => setConnected(true));
-    ablyInstance.connection.on("disconnected", () => setConnected(false));
-    ablyInstance.connection.on("failed", () => setConnected(false));
+    const onConnected = () => setConnected(true);
+    const onDisconnected = () => setConnected(false);
+    const onFailed = () => setConnected(false);
+
+    ablyInstance.connection.on("connected", onConnected);
+    ablyInstance.connection.on("disconnected", onDisconnected);
+    ablyInstance.connection.on("failed", onFailed);
 
     setAbly(ablyInstance);
 
     return () => {
+      ablyInstance?.connection.off("connected", onConnected);
+      ablyInstance?.connection.off("disconnected", onDisconnected);
+      ablyInstance?.connection.off("failed", onFailed);
       ablyInstance?.close();
       setAbly(null);
       setConnected(false);
@@ -83,11 +94,12 @@ export function AblyProvider({ children }: { children: ReactNode }) {
     eventName: string,
     data: Record<string, unknown>,
   ) => {
-    if (!ably || !connected) return;
+    if (!ably || ably.connection.state !== "connected") return;
+
     try {
       ably.channels.get(channelName).publish(eventName, data);
     } catch {
-      // Non-critical realtime publish failure
+      // Ignore publish failures (stale connection, capability, etc.)
     }
   };
 

@@ -34,8 +34,9 @@ export async function GET() {
     const rest = new Ably.Rest({ key: apiKey });
     const tokenRequest = await rest.auth.createTokenRequest({
       clientId: user.id,
+      // Channel name is "rides" (not "rides:foo") — "rides:*" would not grant access.
       capability: {
-        "rides:*": ["subscribe", "publish"],
+        rides: ["subscribe", "publish"],
       },
     });
 

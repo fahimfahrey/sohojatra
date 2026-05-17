@@ -7,7 +7,7 @@ import Footer from "@/components/layout/Footer";
 import RideDetail from "@/components/rides/RideDetail";
 import { getRideByIdAction } from "@/app/actions/rides";
 import { useRide } from "@/contexts/RideContext";
-import { useAbly } from "@/contexts/AblyContext";
+import { RIDES_CHANNEL, useAbly } from "@/contexts/AblyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import type { RideRequest } from "@/types";
 
@@ -41,7 +41,7 @@ export default function RideDetailView({ rideId }: { rideId: string }) {
 
   useEffect(() => {
     if (!user) return;
-    return subscribeToEvent("rides", "sync", () => {
+    return subscribeToEvent(RIDES_CHANNEL, "sync", () => {
       getRideByIdAction(rideId).then((result) => {
         if (result.success && result.data) setRide(result.data);
       });

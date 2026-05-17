@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useRide } from "../../contexts/RideContext";
-import { useAbly } from "../../contexts/AblyContext";
+import { RIDES_CHANNEL, useAbly } from "../../contexts/AblyContext";
 import { Search, MapPin, Filter, Car, X } from "lucide-react";
 import { Location, RideRequest, VehicleType } from "../../types";
 import GlobalMap from "../map/MapLoader";
@@ -106,26 +106,29 @@ const FindRideForm: React.FC = () => {
     console.log("Setting up real-time ride update subscriptions");
 
     // Subscribe to all ride events that might affect our results
-    const unsubscribeNew = subscribeToEvent("rides", "new", handleNewRide);
+    const unsubscribeNew = subscribeToEvent(RIDES_CHANNEL, "new", handleNewRide);
     const unsubscribeUpdate = subscribeToEvent(
-      "rides",
+      RIDES_CHANNEL,
       "update",
       handleUpdateRide,
     );
     const unsubscribeJoin = subscribeToEvent(
-      "rides",
+      RIDES_CHANNEL,
       "join",
       handleGenericEvent,
     );
     const unsubscribeLeave = subscribeToEvent(
-      "rides",
+      RIDES_CHANNEL,
       "leave",
       handleGenericEvent,
     );
-    const unsubscribeSync = subscribeToEvent("rides", "sync", handleSyncEvent);
+    const unsubscribeSync = subscribeToEvent(
+      RIDES_CHANNEL,
+      "sync",
+      handleSyncEvent,
+    );
 
     return () => {
-      console.log("Cleaning up ride subscriptions");
       unsubscribeNew();
       unsubscribeUpdate();
       unsubscribeJoin();

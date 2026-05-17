@@ -10,6 +10,7 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Location, RideRequest } from "../../types";
+import { requestCurrentPosition } from "@/lib/geolocation";
 // icons not used directly here
 import MapTileLayers from "./MapTileLayers";
 
@@ -186,21 +187,25 @@ const RideMap: React.FC<RideMapProps> = ({
     fetchRoute();
   }, [showRoute, derivedStartingPoint?.coordinates, derivedDestination?.coordinates]);
 
-  // Get user's current location on component mount
   useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCurrentPosition([
-            position.coords.latitude,
-            position.coords.longitude,
-          ]);
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-        }
-      );
+    if (typeof navigator === "undefined" || !navigator.permissions?.query) {
+      return;
     }
+
+    navigator.permissions
+      .query({ name: "geolocation" })
+      .then((status) => {
+        if (status.state !== "granted") return;
+        return requestCurrentPosition({ maximumAge: 60_000, timeout: 10_000 });
+      })
+      .then((position) => {
+        if (!position) return;
+        setCurrentPosition([
+          position.coords.latitude,
+          position.coords.longitude,
+        ]);
+      })
+      .catch(() => {});
   }, []);
 
   // Fit bounds to the route when both points are present
