@@ -157,7 +157,7 @@ interface LocationSearchInputProps {
   onClear: () => void;
   type: "start" | "destination";
   setLoading: (isLoading: boolean) => void;
-  mapRef: React.RefObject<L.Map>;
+  mapRef: React.RefObject<L.Map | null>;
 }
 
 const LocationSearchInput: React.FC<LocationSearchInputProps> = ({
