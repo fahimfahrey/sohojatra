@@ -89,63 +89,33 @@ export async function getRideByIdAction(
 
 /**
  * Returns the ride creator's phone only when the caller is an active passenger.
+ * Phone is decrypted server-side via the get_ride_creator_phone RPC; the
+ * encrypted column is never selected directly.
  */
 export async function getCreatorPhoneAction(
   rideId: string,
 ): Promise<ActionResult<{ phone: string }>> {
   try {
-    const user = await requireUser();
+    await requireUser();
     const parsed = rideIdSchema.safeParse({ rideId });
     if (!parsed.success) {
       return { success: false, error: "Invalid ride" };
     }
 
     const supabase = await createClient();
-    const { data: ride, error: rideError } = await supabase
-      .from("ride_requests")
-      .select("id, creator_id, status, contact_phone")
-      .eq("id", parsed.data.rideId)
-      .single();
+    const { data, error } = await supabase.rpc("get_ride_creator_phone", {
+      p_ride_id: parsed.data.rideId,
+    });
 
-    if (rideError || !ride) {
-      return { success: false, error: "Ride not found" };
-    }
-
-    if (ride.creator_id === user.id) {
-      return { success: false, error: "Not available for ride creators" };
-    }
-
-    if (ride.status === "completed" || ride.status === "cancelled") {
-      return { success: false, error: "Ride is no longer active" };
-    }
-
-    const { data: membership, error: memberError } = await supabase
-      .from("ride_passengers")
-      .select("user_id")
-      .eq("ride_id", parsed.data.rideId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (memberError || !membership) {
+    if (error) {
       return { success: false, error: "Access denied" };
     }
 
-    if (ride.contact_phone) {
-      return { success: true, data: { phone: ride.contact_phone } };
-    }
-
-    const { data: creatorPassenger, error: phoneError } = await supabase
-      .from("ride_passengers")
-      .select("contact_phone")
-      .eq("ride_id", parsed.data.rideId)
-      .eq("user_id", ride.creator_id)
-      .maybeSingle();
-
-    if (phoneError || !creatorPassenger?.contact_phone) {
+    if (!data) {
       return { success: false, error: "Creator phone not available" };
     }
 
-    return { success: true, data: { phone: creatorPassenger.contact_phone } };
+    return { success: true, data: { phone: data as string } };
   } catch {
     return { success: false, error: "Unauthorized" };
   }

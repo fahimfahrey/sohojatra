@@ -7,6 +7,24 @@ import {
 } from "./browserNotifications";
 import { VehicleType } from "../types";
 
+type RideRow = {
+  id: string;
+  creator_id: string;
+  starting_point: Location;
+  destination: Location;
+  seats_available: number;
+  total_seats: number;
+  status: RideStatus;
+  created_at: string;
+  vehicle: VehicleType;
+  contact_phone: string | null;
+  updated_at?: string;
+};
+
+type PassengerUserRow = { user_id: string };
+type PassengerRideRow = { ride_id: string };
+type PassengerJoinRow = { ride_id: string; user_id: string };
+
 /**
  * Search for rides matching a route with server-side filtering
  * This prevents exposing all ride data to the client
@@ -60,7 +78,7 @@ export const searchRidesByRoute = async (
 
     // Client-side filtering for proximity (since PostgREST doesn't have built-in geo functions)
     // In production, you should use PostGIS extension for proper geo queries
-    const matchingRides = (data || []).filter((ride) => {
+    const matchingRides = ((data || []) as RideRow[]).filter((ride: RideRow) => {
       const startPoint = ride.starting_point as Location;
       const destPoint = ride.destination as Location;
 
@@ -79,7 +97,7 @@ export const searchRidesByRoute = async (
 
     // Fetch passengers only for matching rides
     const ridesWithPassengers = await Promise.all(
-      matchingRides.map(async (ride) => {
+      matchingRides.map(async (ride: RideRow) => {
         const { data: passengers } = await supabase
           .from("ride_passengers")
           .select("user_id")
@@ -92,7 +110,7 @@ export const searchRidesByRoute = async (
           destination: ride.destination as Location,
           seatsAvailable: ride.seats_available,
           totalSeats: ride.total_seats,
-          passengers: passengers?.map((p) => p.user_id) || [],
+          passengers: passengers?.map((p: PassengerUserRow) => p.user_id) || [],
           status: ride.status as RideStatus,
           createdAt: ride.created_at,
           vehicle: ride.vehicle as VehicleType,
@@ -146,9 +164,9 @@ export const fetchUserRides = async (userId: string) => {
 
     if (joinedError) throw joinedError;
 
-    const joinedIds = joinedRideIds?.map((r) => r.ride_id) || [];
+    const joinedIds = joinedRideIds?.map((r: PassengerRideRow) => r.ride_id) || [];
 
-    let joinedRides: any[] = [];
+    let joinedRides: RideRow[] = [];
     if (joinedIds.length > 0) {
       const { data, error } = await supabase
         .from("ride_requests")
@@ -169,17 +187,19 @@ export const fetchUserRides = async (userId: string) => {
         .in("id", joinedIds);
 
       if (error) throw error;
-      joinedRides = data || [];
+      joinedRides = (data || []) as RideRow[];
     }
 
     // Combine and deduplicate
-    const allRideIds = new Set([
-      ...(createdRides || []).map((r) => r.id),
-      ...joinedRides.map((r) => r.id),
+    const createdRidesTyped = (createdRides || []) as RideRow[];
+    const allRideIds = new Set<string>([
+      ...createdRidesTyped.map((r: RideRow) => r.id),
+      ...joinedRides.map((r: RideRow) => r.id),
     ]);
 
-    const allRides = [...(createdRides || []), ...joinedRides].filter(
-      (ride, index, self) => self.findIndex((r) => r.id === ride.id) === index,
+    const allRides = [...createdRidesTyped, ...joinedRides].filter(
+      (ride: RideRow, index: number, self: RideRow[]) =>
+        self.findIndex((r: RideRow) => r.id === ride.id) === index,
     );
 
     // Fetch passengers for user's rides
@@ -189,14 +209,14 @@ export const fetchUserRides = async (userId: string) => {
       .in("ride_id", Array.from(allRideIds));
 
     const passengersByRide = new Map<string, string[]>();
-    (allPassengers || []).forEach((p) => {
+    (allPassengers || []).forEach((p: PassengerJoinRow) => {
       if (!passengersByRide.has(p.ride_id)) {
         passengersByRide.set(p.ride_id, []);
       }
       passengersByRide.get(p.ride_id)!.push(p.user_id);
     });
 
-    return allRides.map((ride) => ({
+    return allRides.map((ride: RideRow) => ({
       id: ride.id,
       creator: ride.creator_id,
       startingPoint: ride.starting_point as Location,
@@ -239,7 +259,7 @@ export const fetchAllRides = async () => {
     if (error) throw error;
 
     const transformedData = await Promise.all(
-      (data || []).map(async (ride) => {
+      ((data || []) as RideRow[]).map(async (ride: RideRow) => {
         const passengers = await fetchRidePassengers(ride.id);
         return {
           id: ride.id,
@@ -316,7 +336,7 @@ export const fetchRidePassengers = async (rideId: string) => {
     throw error;
   }
 
-  return data?.map((p) => p.user_id) || [];
+  return data?.map((p: PassengerUserRow) => p.user_id) || [];
 };
 
 export const fetchRidePassengersWithDetails = async (rideId: string) => {
