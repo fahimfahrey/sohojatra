@@ -11,11 +11,65 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 };
 
+const ALLOWED_ORIGIN = (() => {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!raw) return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+})();
+
+const CORS_ALLOWED_METHODS = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
+const CORS_ALLOWED_HEADERS = "Content-Type, Authorization, X-Requested-With";
+const CORS_MAX_AGE = "86400";
+
 function applySecurityHeaders(response: NextResponse): NextResponse {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     response.headers.set(key, value);
   }
   return response;
+}
+
+function applyCorsHeaders(response: NextResponse, origin: string): NextResponse {
+  response.headers.set("Access-Control-Allow-Origin", origin);
+  response.headers.set("Access-Control-Allow-Credentials", "true");
+  response.headers.set("Access-Control-Allow-Methods", CORS_ALLOWED_METHODS);
+  response.headers.set("Access-Control-Allow-Headers", CORS_ALLOWED_HEADERS);
+  response.headers.set("Access-Control-Max-Age", CORS_MAX_AGE);
+  response.headers.append("Vary", "Origin");
+  return response;
+}
+
+function handleCors(request: NextRequest): NextResponse | null {
+  if (!request.nextUrl.pathname.startsWith("/api/")) return null;
+
+  const origin = request.headers.get("origin");
+
+  // No Origin: same-origin nav or non-browser client. Allow; no CORS headers needed.
+  if (!origin) {
+    if (request.method === "OPTIONS") {
+      return new NextResponse(null, { status: 204 });
+    }
+    return null;
+  }
+
+  if (!ALLOWED_ORIGIN || origin !== ALLOWED_ORIGIN) {
+    const rejection = NextResponse.json(
+      { error: "Origin not allowed" },
+      { status: 403 },
+    );
+    rejection.headers.append("Vary", "Origin");
+    return rejection;
+  }
+
+  if (request.method === "OPTIONS") {
+    const preflight = new NextResponse(null, { status: 204 });
+    return applyCorsHeaders(preflight, origin);
+  }
+
+  return null;
 }
 
 function validateApiRequest(request: NextRequest): NextResponse | null {
@@ -60,10 +114,21 @@ function validateApiRequest(request: NextRequest): NextResponse | null {
 }
 
 export async function middleware(request: NextRequest) {
+  const corsResponse = handleCors(request);
+  if (corsResponse) return applySecurityHeaders(corsResponse);
+
   const rejection = validateApiRequest(request);
-  if (rejection) return applySecurityHeaders(rejection);
+  if (rejection) {
+    const origin = request.headers.get("origin");
+    if (origin && origin === ALLOWED_ORIGIN) applyCorsHeaders(rejection, origin);
+    return applySecurityHeaders(rejection);
+  }
 
   const response = await updateSession(request);
+  const origin = request.headers.get("origin");
+  if (origin && origin === ALLOWED_ORIGIN && request.nextUrl.pathname.startsWith("/api/")) {
+    applyCorsHeaders(response, origin);
+  }
   return applySecurityHeaders(response);
 }
 
