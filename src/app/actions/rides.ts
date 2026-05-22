@@ -126,6 +126,12 @@ export async function createRideAction(
 ): Promise<ActionResult<{ rideId: string }>> {
   try {
     const user = await requireUser();
+    if (!user.email_confirmed_at) {
+      return {
+        success: false,
+        error: "Please verify your email before creating a ride",
+      };
+    }
     const parsed = createRideSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: "Invalid ride data" };
