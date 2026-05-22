@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/require-user";
-import type { ActionResult } from "@/lib/validation/schemas";
+import { messageSchema, type ActionResult } from "@/lib/validation/schemas";
 import type { NotificationMessage } from "@/types";
 
 const notificationIdSchema = z.object({
@@ -101,7 +101,7 @@ export async function createNotificationAction(input: {
 }): Promise<ActionResult> {
   try {
     const user = await requireUser();
-    const message = z.string().min(1).max(500).parse(input.message);
+    const message = messageSchema.parse(input.message);
     const type = z
       .enum(["match", "update", "join", "system", "leave"])
       .parse(input.type);
