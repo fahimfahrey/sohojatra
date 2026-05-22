@@ -4,6 +4,20 @@ import { updateSession } from "@/lib/supabase/middleware";
 const MAX_BODY_BYTES = 1_048_576; // 1 MB
 const BODY_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "X-XSS-Protection": "1; mode=block",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+};
+
+function applySecurityHeaders(response: NextResponse): NextResponse {
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  return response;
+}
+
 function validateApiRequest(request: NextRequest): NextResponse | null {
   if (!request.nextUrl.pathname.startsWith("/api/")) return null;
   if (!BODY_METHODS.has(request.method)) return null;
@@ -47,9 +61,10 @@ function validateApiRequest(request: NextRequest): NextResponse | null {
 
 export async function middleware(request: NextRequest) {
   const rejection = validateApiRequest(request);
-  if (rejection) return rejection;
+  if (rejection) return applySecurityHeaders(rejection);
 
-  return updateSession(request);
+  const response = await updateSession(request);
+  return applySecurityHeaders(response);
 }
 
 export const config = {
