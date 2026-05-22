@@ -16,6 +16,8 @@ export interface Database {
           email: string;
           created_at: string;
           updated_at: string;
+          deletion_requested_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -23,6 +25,8 @@ export interface Database {
           email: string;
           created_at?: string;
           updated_at?: string;
+          deletion_requested_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: {
           id?: string;
@@ -30,6 +34,8 @@ export interface Database {
           email?: string;
           created_at?: string;
           updated_at?: string;
+          deletion_requested_at?: string | null;
+          deleted_at?: string | null;
         };
       };
       ride_requests: {
@@ -44,6 +50,8 @@ export interface Database {
           created_at: string;
           updated_at: string;
           contact_phone?: string;
+          deleted_at: string | null;
+          status_changed_at: string | null;
         };
         Insert: {
           id?: string;
@@ -56,6 +64,8 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           contact_phone?: string;
+          deleted_at?: string | null;
+          status_changed_at?: string | null;
         };
         Update: {
           id?: string;
@@ -68,6 +78,8 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
           contact_phone?: string;
+          deleted_at?: string | null;
+          status_changed_at?: string | null;
         };
       };
       ride_passengers: {
@@ -76,18 +88,21 @@ export interface Database {
           user_id: string;
           joined_at: string;
           contact_phone?: string;
+          deleted_at: string | null;
         };
         Insert: {
           ride_id: string;
           user_id: string;
           joined_at?: string;
           contact_phone?: string;
+          deleted_at?: string | null;
         };
         Update: {
           ride_id?: string;
           user_id?: string;
           joined_at?: string;
           contact_phone?: string;
+          deleted_at?: string | null;
         };
       };
       notifications: {
@@ -99,6 +114,7 @@ export interface Database {
           read: boolean;
           ride_id: string | null;
           created_at: string;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -108,6 +124,7 @@ export interface Database {
           read?: boolean;
           ride_id?: string | null;
           created_at?: string;
+          deleted_at?: string | null;
         };
         Update: {
           id?: string;
@@ -117,6 +134,7 @@ export interface Database {
           read?: boolean;
           ride_id?: string | null;
           created_at?: string;
+          deleted_at?: string | null;
         };
       };
     };
