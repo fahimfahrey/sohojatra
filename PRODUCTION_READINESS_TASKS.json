@@ -1,0 +1,244 @@
+{
+  "tasks": [
+    {
+      "title": "Replace weak XOR encryption with TweetNaCl.js",
+      "description": "src/lib/encryption.ts uses a simple XOR cipher which is NOT cryptographically secure. Replace with TweetNaCl.js (tweetnacl-js package) for proper authenticated encryption. Update encryptRealTimeData and decryptRealTimeData to use nacl.secretbox for symmetric encryption. Add proper key derivation using PBKDF2. This prevents attackers from decrypting sensitive ride data."
+    },
+    {
+      "title": "Fix TypeScript strict mode errors in database.ts",
+      "description": "src/lib/database.ts has 7 implicit 'any' type errors. Add proper type annotations to all callback parameters: ride, p, r in map/filter functions. Example: .map((ride: RideRequest) => ...). Enable strict mode in tsconfig.json to catch these at compile time."
+    },
+    {
+      "title": "Implement CSRF protection for all state-changing actions",
+      "description": "Add CSRF token validation to all server actions that modify data (createRideAction, joinRideAction, cancelRideAction, completeRideAction). Use next-csrf or implement custom middleware. Generate tokens in layout.tsx, pass via hidden form fields, validate in each action. Prevents cross-site request forgery attacks."
+    },
+    {
+      "title": "Add rate limiting to all API endpoints and server actions",
+      "description": "Current rate limiting in src/lib/rate-limit/server.ts uses in-memory Map which resets on server restart. Replace with Redis-backed rate limiting (use @upstash/redis or similar). Apply to: signInAction (5/15min), signUpAction (3/1hr), searchRidesAction (30/1min), joinRideAction (10/1min). Prevents brute force and DoS attacks."
+    },
+    {
+      "title": "Implement request logging and audit trail",
+      "description": "Add comprehensive logging for all sensitive operations: auth attempts, ride creation/joining, phone number access. Log to a separate audit table with: user_id, action, resource_id, timestamp, ip_address, user_agent. Use middleware to capture IP and user agent. Enables security incident investigation."
+    },
+    {
+      "title": "Add input sanitization for all user-provided data",
+      "description": "While Zod validates structure, add sanitization for XSS prevention. Use DOMPurify or similar for address fields in locations. Sanitize all string inputs before storing in database. Prevents stored XSS attacks in ride addresses and user names."
+    },
+    {
+      "title": "Implement proper phone number encryption at database level",
+      "description": "Phone numbers are currently stored in contact_phone field. Implement database-level encryption using pgcrypto extension in Supabase. Create a trigger that encrypts contact_phone on insert/update. Only decrypt when explicitly needed (getCreatorPhoneAction). Prevents data leaks if database is compromised."
+    },
+    {
+      "title": "Add Row-Level Security (RLS) policies for all tables",
+      "description": "Implement RLS policies in Supabase for: ride_requests (users can only see open rides or their own), ride_passengers (users can only see their own passenger records), notifications (users can only see their own), users (users can only see their own profile). This prevents direct database access from bypassing authorization logic."
+    },
+    {
+      "title": "Implement secure session management with refresh token rotation",
+      "description": "Current Supabase SSR setup is basic. Add automatic refresh token rotation on each request. Implement session timeout (30 min inactivity). Add secure cookie flags: HttpOnly, Secure, SameSite=Strict. Update src/lib/supabase/middleware.ts to enforce these. Prevents session hijacking."
+    },
+    {
+      "title": "Add Content Security Policy (CSP) headers",
+      "description": "next.config.ts has basic security headers but missing CSP. Add strict CSP header: 'default-src self; script-src self; style-src self unsafe-inline; img-src self https:; connect-src self https:'. Prevents inline script injection and restricts resource loading."
+    },
+    {
+      "title": "Implement API rate limiting with Vercel KV or Redis",
+      "description": "Replace in-memory rate limiting with persistent storage. Use Vercel KV (if on Vercel) or Redis. Create rate limit middleware that applies to all API routes. Configure: 100 requests/min per IP for public endpoints, 1000/min for authenticated users. Prevents abuse and DoS."
+    },
+    {
+      "title": "Add email verification requirement before ride creation",
+      "description": "Users can create rides without verifying email. Add check in createRideAction: if user.email_confirmed_at is null, return error. Force email verification during signup. Prevents spam and ensures valid contact information."
+    },
+    {
+      "title": "Implement phone number verification via OTP",
+      "description": "Phone numbers are critical for ride coordination but unverified. Add OTP verification: generate 6-digit code, send via SMS (use Twilio or similar), verify before storing. Add verified_phone_at timestamp. Only show verified phone numbers to other passengers. Prevents fake contact info."
+    },
+    {
+      "title": "Add user profile validation and completeness checks",
+      "description": "Users can join rides with minimal profile info. Add profile completeness check: require name, verified email, verified phone before allowing ride participation. Add profile_completed_at field. Prevents low-quality user accounts from disrupting rides."
+    },
+    {
+      "title": "Implement ride cancellation penalties and user reputation",
+      "description": "Add cancellation_count and reputation_score to users table. Track cancellations per user. If user cancels >3 rides in 30 days, flag account. Show reputation score to other users. Prevents serial cancellers from disrupting the platform."
+    },
+    {
+      "title": "Add geolocation validation to prevent location spoofing",
+      "description": "Users can submit arbitrary coordinates. Add server-side validation: verify coordinates are within Bangladesh bounds. Add distance sanity check: if start and destination are >500km apart, reject. Prevents abuse and ensures realistic rides."
+    },
+    {
+      "title": "Implement secure file upload for user avatars",
+      "description": "No avatar upload currently, but add if needed. Use Supabase Storage with: file size limit (5MB), allowed MIME types (image/jpeg, image/png), virus scanning. Generate random filenames to prevent path traversal. Add CDN caching headers. Prevents malware uploads."
+    },
+    {
+      "title": "Add comprehensive error handling without information leakage",
+      "description": "Current error messages are generic but some may leak info. Audit all error responses: never expose database errors, file paths, or internal logic. Log detailed errors server-side only. Return generic 'Something went wrong' to client. Prevents information disclosure attacks."
+    },
+    {
+      "title": "Implement API versioning and deprecation strategy",
+      "description": "Add /api/v1/ prefix to all API routes. Document breaking changes. Implement deprecation headers: Deprecation: true, Sunset: <date>. Allows safe API evolution without breaking clients."
+    },
+    {
+      "title": "Add request validation middleware for all API routes",
+      "description": "Create middleware that validates Content-Type, Content-Length, and request body size. Reject requests >1MB. Reject non-JSON content-type for API endpoints. Prevents buffer overflow and malformed request attacks."
+    },
+    {
+      "title": "Implement secure password reset flow",
+      "description": "No password reset currently visible. Add: POST /api/auth/reset-password (email), generates 30-min token, stores in reset_tokens table with hash. User clicks link with token, POST /api/auth/confirm-reset (token, new_password). Validate token hasn't expired, hash password, clear token. Prevents unauthorized password changes."
+    },
+    {
+      "title": "Add two-factor authentication (2FA) support",
+      "description": "Implement optional 2FA using TOTP (Time-based One-Time Password). Use speakeasy or similar. Add enable2FA action, verify2FA action. Store secret encrypted in users table. Require 2FA for sensitive operations (ride creation, phone changes). Prevents account takeover."
+    },
+    {
+      "title": "Implement secure logout with token invalidation",
+      "description": "Current signOutAction only clears session. Add token blacklist: store invalidated tokens in Redis with expiry. Check blacklist on each request. Prevents token reuse after logout."
+    },
+    {
+      "title": "Add database connection pooling and query optimization",
+      "description": "Supabase connections may not be pooled. Enable PgBouncer in Supabase settings. Add query timeouts (30s default). Optimize N+1 queries in searchRidesByRouteServer (currently fetches passengers per ride). Use batch queries or joins. Prevents connection exhaustion and slow queries."
+    },
+    {
+      "title": "Implement proper error tracking and monitoring",
+      "description": "Add Sentry or similar error tracking. Capture all unhandled errors, server action failures, API errors. Include context: user_id, ride_id, action. Set up alerts for critical errors (auth failures, database errors). Enables rapid incident response."
+    },
+    {
+      "title": "Add security headers for API responses",
+      "description": "Add to all API responses: X-Content-Type-Options: nosniff, X-Frame-Options: DENY, X-XSS-Protection: 1; mode=block, Strict-Transport-Security: max-age=31536000. Create middleware to apply consistently. Prevents MIME sniffing and clickjacking."
+    },
+    {
+      "title": "Implement CORS policy with whitelist",
+      "description": "If API is accessed from other domains, implement strict CORS. Only allow NEXT_PUBLIC_SITE_URL. Reject credentials from other origins. Add middleware to validate Origin header. Prevents cross-origin data theft."
+    },
+    {
+      "title": "Add database backup and recovery procedures",
+      "description": "Enable automated daily backups in Supabase. Test recovery process monthly. Document RTO/RPO requirements. Store backups in separate region. Enables recovery from data loss or corruption."
+    },
+    {
+      "title": "Implement secrets rotation policy",
+      "description": "Document rotation schedule for: Supabase keys (quarterly), Ably API key (quarterly), encryption keys (annually). Use Vercel Secrets or similar for key management. Automate rotation where possible. Limits impact of key compromise."
+    },
+    {
+      "title": "Add dependency vulnerability scanning",
+      "description": "Set up Dependabot or Snyk to scan dependencies weekly. Review and patch vulnerabilities within 7 days for critical, 30 days for high. Pin exact versions in package.json. Prevents known vulnerability exploitation."
+    },
+    {
+      "title": "Implement comprehensive logging for compliance",
+      "description": "Add structured logging for: user authentication, data access, modifications, deletions. Include timestamp, user_id, action, resource_id, changes. Store in audit_logs table. Retain for 1 year. Enables compliance audits and forensics."
+    },
+    {
+      "title": "Add data retention and deletion policies",
+      "description": "Implement automatic deletion of: completed rides after 90 days, cancelled rides after 30 days, user data 30 days after account deletion. Add soft delete flags. Document retention requirements. Complies with data minimization principles."
+    },
+    {
+      "title": "Implement privacy controls and data export",
+      "description": "Add user endpoints: GET /api/user/data (export all personal data as JSON), DELETE /api/user/account (soft delete with 30-day recovery window). Log all data access. Complies with privacy regulations."
+    },
+    {
+      "title": "Add security.txt file for vulnerability disclosure",
+      "description": "Create public/security.txt with contact info for security researchers. Include: Contact: security@sohojatra.com, Expires: <1 year from now>. Enables responsible disclosure of vulnerabilities."
+    },
+    {
+      "title": "Implement API documentation with security guidelines",
+      "description": "Create API docs (Swagger/OpenAPI) documenting all endpoints, auth requirements, rate limits, error codes. Include security best practices for integrators. Host at /api/docs. Prevents misuse and improves security awareness."
+    },
+    {
+      "title": "Add environment-specific configuration validation",
+      "description": "Create config validation script that runs on startup. Verify: all required env vars present, NEXT_PUBLIC_SITE_URL matches deployment domain, database connection works, Supabase keys are valid. Fail fast if misconfigured. Prevents configuration errors in production."
+    },
+    {
+      "title": "Implement graceful degradation for third-party services",
+      "description": "If Ably (real-time) or Supabase goes down, app should still function. Add fallback: if Ably fails, use polling. If Supabase fails, show cached data with warning. Add circuit breaker pattern. Improves reliability."
+    },
+    {
+      "title": "Add performance monitoring and optimization",
+      "description": "Use Vercel Analytics or similar. Monitor: page load time, API response time, database query time. Set targets: <3s page load, <200ms API response. Optimize slow queries and components. Improves user experience."
+    },
+    {
+      "title": "Implement proper TypeScript strict mode",
+      "description": "Enable strict mode in tsconfig.json: strict: true, noImplicitAny: true, strictNullChecks: true, strictFunctionTypes: true. Fix all errors. Prevents type-related bugs."
+    },
+    {
+      "title": "Add pre-commit hooks for security checks",
+      "description": "Use husky + lint-staged. Run: eslint, type check, security audit (npm audit), secrets scan (detect-secrets). Prevent committing vulnerable code or secrets."
+    },
+    {
+      "title": "Implement CI/CD security scanning",
+      "description": "Add to GitHub Actions: npm audit, SAST (SonarQube or similar), dependency check (OWASP), container scan if using Docker. Fail build on critical issues. Catches vulnerabilities before deployment."
+    },
+    {
+      "title": "Add security testing to test suite",
+      "description": "Write tests for: auth bypass attempts, CSRF attacks, SQL injection (if applicable), XSS payloads, rate limit enforcement. Use OWASP Top 10 as checklist. Run in CI/CD. Ensures security controls work."
+    },
+    {
+      "title": "Implement API authentication with API keys for third-party integrations",
+      "description": "If third parties need API access, implement API key authentication. Generate keys with: name, permissions, rate limit, expiry. Store hashed in database. Rotate quarterly. Enables secure integrations."
+    },
+    {
+      "title": "Add webhook signature verification",
+      "description": "If using webhooks (Supabase, Ably), verify signatures using HMAC-SHA256. Store webhook secrets securely. Reject unsigned webhooks. Prevents webhook spoofing."
+    },
+    {
+      "title": "Implement proper database transaction handling",
+      "description": "Wrap multi-step operations (createRide + addPassenger) in transactions. Use Supabase RPC or transactions. Rollback on any error. Prevents partial updates and data inconsistency."
+    },
+    {
+      "title": "Add idempotency keys for critical operations",
+      "description": "For joinRideAction and createRideAction, require idempotency-key header. Store processed keys in cache (Redis) with 24h expiry. Return cached response if duplicate. Prevents duplicate rides/joins from retries."
+    },
+    {
+      "title": "Implement proper handling of sensitive data in logs",
+      "description": "Audit all logging: never log passwords, tokens, phone numbers, email addresses. Use redaction: replace with [REDACTED]. Implement log retention policy (30 days). Prevents sensitive data leaks via logs."
+    },
+    {
+      "title": "Add security headers for static assets",
+      "description": "Set Cache-Control: public, max-age=31536000, immutable for versioned assets. Set Cache-Control: no-cache for HTML. Add Subresource Integrity (SRI) for CDN resources. Prevents cache poisoning."
+    },
+    {
+      "title": "Implement proper HTTPS enforcement",
+      "description": "Set HSTS header: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload. Redirect all HTTP to HTTPS. Add domain to HSTS preload list. Prevents man-in-the-middle attacks."
+    },
+    {
+      "title": "Add security incident response plan",
+      "description": "Document: incident detection, escalation, containment, eradication, recovery, post-incident review. Assign roles: incident commander, security lead, ops lead. Test quarterly. Enables rapid response to breaches."
+    },
+    {
+      "title": "Implement user consent and privacy notices",
+      "description": "Add privacy policy and terms of service. Require explicit consent before collecting location data. Add cookie consent banner. Document data usage. Complies with privacy laws (GDPR, local regulations)."
+    },
+    {
+      "title": "Add rate limiting to password reset endpoint",
+      "description": "Password reset endpoint should have strict rate limiting: 3 attempts per email per hour. Prevents brute force password reset attacks."
+    },
+    {
+      "title": "Implement secure communication for sensitive data",
+      "description": "Ensure all sensitive data (phone numbers, locations) is only transmitted over HTTPS. Add encryption layer for real-time data using TweetNaCl.js. Prevents eavesdropping."
+    },
+    {
+      "title": "Add account lockout after failed login attempts",
+      "description": "After 5 failed login attempts in 15 minutes, lock account for 30 minutes. Send email notification. Require email verification to unlock. Prevents brute force attacks."
+    },
+    {
+      "title": "Implement secure session storage",
+      "description": "Ensure session cookies are: HttpOnly (no JS access), Secure (HTTPS only), SameSite=Strict (no cross-site). Set short expiry (30 min). Implement refresh token rotation. Prevents session hijacking."
+    },
+    {
+      "title": "Add validation for ride distance and duration",
+      "description": "Add business logic validation: reject rides >500km, reject rides with unrealistic duration. Add estimated_duration field. Prevents abuse and ensures realistic rides."
+    },
+    {
+      "title": "Implement proper handling of concurrent ride modifications",
+      "description": "Use optimistic locking: add version field to ride_requests. Check version on update. Retry if version mismatch. Prevents race conditions when multiple users modify same ride."
+    },
+    {
+      "title": "Add comprehensive API documentation with examples",
+      "description": "Document all endpoints: method, path, auth, parameters, response, errors, rate limits. Include curl examples. Host at /api/docs. Enables safe API usage."
+    },
+    {
+      "title": "Implement proper error recovery and retry logic",
+      "description": "Add exponential backoff for failed requests. Implement circuit breaker for external services. Add retry limits (3 attempts). Prevents cascading failures."
+    },
+    {
+      "title": "Add security awareness training documentation",
+      "description": "Create docs for developers: secure coding practices, OWASP Top 10, common vulnerabilities, how to report security issues. Link from README. Improves team security awareness."
+    }
+  ]
+}

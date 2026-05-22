@@ -9,10 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@serwist/turbopack": "^9.5.11",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.39.7",
     "@types/lodash": "^4.17.16",
     "ably": "^1.2.48",
+    "esbuild": "^0.25.0",
+    "esbuild-wasm": "^0.25.0",
     "eslint-config-next": "^16.2.6",
     "leaflet": "^1.9.4",
     "lodash": "^4.17.21",
@@ -22,10 +25,9 @@
     "react-dom": "^19.2.6",
     "react-hot-toast": "^2.4.1",
     "react-leaflet": "^5.0.0",
-    "@serwist/turbopack": "^9.5.11",
-    "esbuild": "^0.25.0",
-    "esbuild-wasm": "^0.25.0",
     "serwist": "^9.5.11",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1",
     "uuid": "^9.0.1",
     "zod": "^4.4.3"
   },

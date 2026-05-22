@@ -1,91 +1,151 @@
 /**
- * Simple encryption utility for real-time data
- * Uses base64 encoding with a simple XOR cipher for client-side encryption
- * For production, consider using TweetNaCl.js or libsodium.js
+ * Real-time data encryption using TweetNaCl (nacl.secretbox).
+ *
+ * - Symmetric authenticated encryption (XSalsa20 + Poly1305 MAC).
+ * - Key derived from a shared secret via PBKDF2-HMAC-SHA-256 (Web Crypto).
+ * - Each ciphertext uses a fresh random 24-byte nonce, prepended to the box.
+ *
+ * Note: a shared client-side secret cannot defend against a malicious client
+ * extracting the key. This module exists to (a) prevent passive observers
+ * on the wire from reading payloads and (b) detect tampering. Per-user keys
+ * negotiated over an authenticated channel should replace this for stronger
+ * threat models.
  */
 
-// Simple encryption key (in production, this should be derived from user session)
-const ENCRYPTION_KEY = "sohojatra-realtime-encryption-v1";
+import nacl from "tweetnacl";
+import naclUtil from "tweetnacl-util";
 
-/**
- * Simple XOR cipher for basic encryption
- * Note: This is NOT cryptographically secure. For production use,
- * implement proper encryption using TweetNaCl.js or similar.
- */
-function xorEncrypt(data: string, key: string): string {
-  let result = "";
-  for (let i = 0; i < data.length; i++) {
-    result += String.fromCharCode(
-      data.charCodeAt(i) ^ key.charCodeAt(i % key.length),
+const SECRET =
+  process.env.NEXT_PUBLIC_REALTIME_ENCRYPTION_SECRET ??
+  "sohojatra-realtime-encryption-v1";
+
+// Fixed application salt: deterministic key derivation so independent
+// clients/servers derive the same symmetric key from the shared secret.
+const SALT = naclUtil.decodeUTF8("sohojatra-pbkdf2-salt-v1");
+const PBKDF2_ITERATIONS = 100_000;
+const KEY_LENGTH_BITS = 256;
+
+let cachedKey: Promise<Uint8Array> | null = null;
+
+async function deriveKey(): Promise<Uint8Array> {
+  if (cachedKey) return cachedKey;
+
+  cachedKey = (async () => {
+    const subtle =
+      typeof globalThis !== "undefined" && globalThis.crypto?.subtle;
+    if (!subtle) {
+      throw new Error(
+        "Web Crypto SubtleCrypto unavailable; cannot derive encryption key",
+      );
+    }
+
+    const baseKey = await subtle.importKey(
+      "raw",
+      naclUtil.decodeUTF8(SECRET),
+      { name: "PBKDF2" },
+      false,
+      ["deriveBits"],
     );
-  }
-  return result;
+
+    const bits = await subtle.deriveBits(
+      {
+        name: "PBKDF2",
+        salt: SALT,
+        iterations: PBKDF2_ITERATIONS,
+        hash: "SHA-256",
+      },
+      baseKey,
+      KEY_LENGTH_BITS,
+    );
+
+    return new Uint8Array(bits);
+  })();
+
+  return cachedKey;
 }
 
-function xorDecrypt(encrypted: string, key: string): string {
-  return xorEncrypt(encrypted, key); // XOR is symmetric
+async function encryptString(plaintext: string): Promise<string> {
+  const key = await deriveKey();
+  const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+  const message = naclUtil.decodeUTF8(plaintext);
+  const box = nacl.secretbox(message, nonce, key);
+
+  const packed = new Uint8Array(nonce.length + box.length);
+  packed.set(nonce, 0);
+  packed.set(box, nonce.length);
+  return naclUtil.encodeBase64(packed);
+}
+
+async function decryptString(encoded: string): Promise<string> {
+  const key = await deriveKey();
+  const packed = naclUtil.decodeBase64(encoded);
+
+  if (packed.length < nacl.secretbox.nonceLength + nacl.secretbox.overheadLength) {
+    throw new Error("Ciphertext too short");
+  }
+
+  const nonce = packed.slice(0, nacl.secretbox.nonceLength);
+  const box = packed.slice(nacl.secretbox.nonceLength);
+  const plain = nacl.secretbox.open(box, nonce, key);
+
+  if (!plain) {
+    throw new Error("Authentication failed");
+  }
+  return naclUtil.encodeUTF8(plain);
 }
 
 /**
- * Encrypt data for real-time transmission
+ * Encrypt data for real-time transmission.
  * @param data Object to encrypt
- * @returns Encrypted string (base64 encoded)
+ * @returns Base64-encoded `nonce || ciphertext+MAC`
  */
-export const encryptRealTimeData = (data: Record<string, unknown>): string => {
+export const encryptRealTimeData = async (
+  data: Record<string, unknown>,
+): Promise<string> => {
   try {
-    const jsonString = JSON.stringify(data);
-    const encrypted = xorEncrypt(jsonString, ENCRYPTION_KEY);
-    return btoa(encrypted); // Base64 encode
-  } catch (error) {
+    return await encryptString(JSON.stringify(data));
+  } catch {
     throw new Error("Failed to encrypt real-time data");
   }
 };
 
 /**
- * Decrypt data from real-time transmission
- * @param encryptedData Base64 encoded encrypted string
+ * Decrypt data from real-time transmission.
+ * @param encryptedData Base64-encoded `nonce || ciphertext+MAC`
  * @returns Decrypted object
  */
-export const decryptRealTimeData = (
+export const decryptRealTimeData = async (
   encryptedData: string,
-): Record<string, unknown> => {
+): Promise<Record<string, unknown>> => {
   try {
-    const encrypted = atob(encryptedData); // Base64 decode
-    const decrypted = xorDecrypt(encrypted, ENCRYPTION_KEY);
-    return JSON.parse(decrypted);
-  } catch (error) {
+    const json = await decryptString(encryptedData);
+    return JSON.parse(json);
+  } catch {
     throw new Error("Failed to decrypt real-time data");
   }
 };
 
 /**
- * Encrypt sensitive fields in ride data
- * @param rideData Ride data object
- * @returns Ride data with encrypted sensitive fields
+ * Encrypt sensitive fields (addresses) in ride data.
  */
-export const encryptRideSensitiveData = (
+export const encryptRideSensitiveData = async (
   rideData: Record<string, unknown>,
-): Record<string, unknown> => {
+): Promise<Record<string, unknown>> => {
   const encrypted = { ...rideData };
 
-  // Encrypt location data
   if (encrypted.startingPoint) {
+    const sp = encrypted.startingPoint as Record<string, unknown>;
     encrypted.startingPoint = {
-      ...encrypted.startingPoint,
-      address: xorEncrypt(
-        (encrypted.startingPoint as Record<string, unknown>).address as string,
-        ENCRYPTION_KEY,
-      ),
+      ...sp,
+      address: await encryptString(sp.address as string),
     };
   }
 
   if (encrypted.destination) {
+    const d = encrypted.destination as Record<string, unknown>;
     encrypted.destination = {
-      ...encrypted.destination,
-      address: xorEncrypt(
-        (encrypted.destination as Record<string, unknown>).address as string,
-        ENCRYPTION_KEY,
-      ),
+      ...d,
+      address: await encryptString(d.address as string),
     };
   }
 
@@ -93,33 +153,26 @@ export const encryptRideSensitiveData = (
 };
 
 /**
- * Decrypt sensitive fields in ride data
- * @param rideData Encrypted ride data object
- * @returns Ride data with decrypted sensitive fields
+ * Decrypt sensitive fields (addresses) in ride data.
  */
-export const decryptRideSensitiveData = (
+export const decryptRideSensitiveData = async (
   rideData: Record<string, unknown>,
-): Record<string, unknown> => {
+): Promise<Record<string, unknown>> => {
   const decrypted = { ...rideData };
 
-  // Decrypt location data
   if (decrypted.startingPoint) {
+    const sp = decrypted.startingPoint as Record<string, unknown>;
     decrypted.startingPoint = {
-      ...decrypted.startingPoint,
-      address: xorDecrypt(
-        (decrypted.startingPoint as Record<string, unknown>).address as string,
-        ENCRYPTION_KEY,
-      ),
+      ...sp,
+      address: await decryptString(sp.address as string),
     };
   }
 
   if (decrypted.destination) {
+    const d = decrypted.destination as Record<string, unknown>;
     decrypted.destination = {
-      ...decrypted.destination,
-      address: xorDecrypt(
-        (decrypted.destination as Record<string, unknown>).address as string,
-        ENCRYPTION_KEY,
-      ),
+      ...d,
+      address: await decryptString(d.address as string),
     };
   }
 
