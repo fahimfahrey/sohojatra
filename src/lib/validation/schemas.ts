@@ -1,8 +1,17 @@
 import { z } from "zod";
+import DOMPurify from "isomorphic-dompurify";
+
+const sanitizeText = (val: string) =>
+  DOMPurify.sanitize(val, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).trim();
 
 export const emailSchema = z.string().email().max(255);
 export const passwordSchema = z.string().min(8).max(128);
-export const nameSchema = z.string().min(2).max(100).trim();
+export const nameSchema = z
+  .string()
+  .min(2)
+  .max(100)
+  .transform(sanitizeText)
+  .pipe(z.string().min(2).max(100));
 export const phoneSchema = z
   .string()
   .regex(/^\+?[0-9]{10,15}$/, "Invalid phone number");
@@ -12,8 +21,20 @@ export const locationSchema = z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
   }),
-  address: z.string().min(3).max(500),
+  address: z
+    .string()
+    .min(3)
+    .max(500)
+    .transform(sanitizeText)
+    .pipe(z.string().min(3).max(500)),
 });
+
+export const messageSchema = z
+  .string()
+  .min(1)
+  .max(500)
+  .transform(sanitizeText)
+  .pipe(z.string().min(1).max(500));
 
 export const vehicleTypeSchema = z.enum([
   "Rickshaw",
