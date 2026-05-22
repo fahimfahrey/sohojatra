@@ -55,16 +55,15 @@ export function AblyProvider({ children }: { children: ReactNode }) {
         fetch("/api/ably/token", { credentials: "include" })
           .then(async (res) => {
             if (!res.ok) {
-              const body = await res.text();
-              callback(
-                body || `Token request failed (${res.status})`,
-                null,
-              );
+              callback("Realtime token request failed", null);
               return;
             }
             callback(null, await res.json());
           })
-          .catch((err: Error) => callback(err.message, null));
+          .catch((err: Error) => {
+            console.error("[ably/token] fetch failed", err);
+            callback("Realtime token request failed", null);
+          });
       },
       autoConnect: true,
     });

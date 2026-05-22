@@ -4,21 +4,39 @@ on:
   schedule:
     - cron: "0 6 * * 1"
   pull_request:
-    paths:
-      - "package.json"
-      - "package-lock.json"
   push:
     branches:
       - main
-    paths:
-      - "package.json"
-      - "package-lock.json"
   workflow_dispatch:
 
 permissions:
   contents: read
+  security-events: write
+  actions: read
 
 jobs:
+  security-tests:
+    name: OWASP security tests (Vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci --ignore-scripts
+
+      - name: Run security test suite
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+          NEXT_PUBLIC_SITE_URL: https://sohojatra.test
+          ABLY_API_KEY: "test:abc123"
+        run: npm run test:security
+
   npm-audit:
     name: npm audit
     runs-on: ubuntu-latest
@@ -44,3 +62,65 @@ jobs:
           name: npm-audit-report
           path: npm-audit.json
           retention-days: 30
+
+  codeql:
+    name: CodeQL SAST
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["javascript-typescript"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          upload: true
+
+  owasp-dependency-check:
+    name: OWASP Dependency-Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps (for accurate scan)
+        run: npm ci --ignore-scripts
+
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: "sohojatra"
+          path: "."
+          format: "ALL"
+          args: >-
+            --enableRetired
+            --failOnCVSS 7
+            --nodeAuditSkipDevDependencies
+            --suppression .github/dependency-check-suppressions.xml
+
+      - name: Upload OWASP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-dependency-check-report
+          path: reports/
+          retention-days: 30
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/dependency-check-report.sarif
