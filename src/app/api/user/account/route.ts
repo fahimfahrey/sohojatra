@@ -3,11 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit/server";
 import { logDataAccess } from "@/lib/audit";
 import { RETENTION_DAYS } from "@/lib/dataRetention";
+import { withTiming } from "@/lib/perf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function DELETE(req: Request) {
+export const DELETE = withTiming("api.user.account.delete", async (req: Request) => {
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     req.headers.get("x-real-ip") ??
@@ -93,4 +94,4 @@ export async function DELETE(req: Request) {
     },
     { status: 200 },
   );
-}
+});

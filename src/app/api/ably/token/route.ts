@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import * as Ably from "ably/promises";
 import { createClient } from "@/lib/supabase/server";
+import { withTiming } from "@/lib/perf";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export const GET = withTiming("api.ably.token", async () => {
   const apiKey = process.env.ABLY_API_KEY?.trim();
   if (!apiKey) {
     return NextResponse.json(
@@ -48,4 +49,4 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
+});
