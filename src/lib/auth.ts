@@ -92,11 +92,12 @@ export const signUp = async ({ email, password, name }: SignUpCredentials) => {
   });
 
   if (result.error) {
-    throw result.error;
+    console.error("[auth.signUp] supabase signUp error", result.error);
+    throw new Error("Failed to create account");
   }
 
   if (!result.data.user) {
-    throw new Error("Failed to create user");
+    throw new Error("Failed to create account");
   }
 
   // The database trigger will handle user creation in most cases,
