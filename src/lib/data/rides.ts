@@ -31,15 +31,21 @@ function mapRide(
   };
 }
 
+// Shared select: ride fields + embedded passengers (single round-trip per query)
+const RIDE_FIELDS =
+  "id, creator_id, starting_point, destination, seats_available, total_seats, status, created_at, vehicle, contact_phone, ride_passengers(user_id)";
+
+function passengersFrom(ride: { ride_passengers?: { user_id: string }[] }): string[] {
+  return ride.ride_passengers?.map((p) => p.user_id) ?? [];
+}
+
 export async function fetchUserRidesServer(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<RideRequest[]> {
   const { data: createdRides, error: createdError } = await supabase
     .from("ride_requests")
-    .select(
-      "id, creator_id, starting_point, destination, seats_available, total_seats, status, created_at, vehicle, contact_phone",
-    )
+    .select(RIDE_FIELDS)
     .eq("creator_id", userId);
 
   if (createdError) throw createdError;
@@ -57,9 +63,7 @@ export async function fetchUserRidesServer(
   if (joinedIds.length > 0) {
     const { data, error } = await supabase
       .from("ride_requests")
-      .select(
-        "id, creator_id, starting_point, destination, seats_available, total_seats, status, created_at, vehicle, contact_phone",
-      )
+      .select(RIDE_FIELDS)
       .in("id", joinedIds);
 
     if (error) throw error;
@@ -70,22 +74,8 @@ export async function fetchUserRidesServer(
     (ride, index, self) => self.findIndex((r) => r.id === ride.id) === index,
   );
 
-  const allRideIds = allRides.map((r) => r.id);
-  const { data: allPassengers } = await supabase
-    .from("ride_passengers")
-    .select("ride_id, user_id")
-    .in("ride_id", allRideIds);
-
-  const passengersByRide = new Map<string, string[]>();
-  (allPassengers ?? []).forEach((p) => {
-    const list = passengersByRide.get(p.ride_id) ?? [];
-    list.push(p.user_id);
-    passengersByRide.set(p.ride_id, list);
-  });
-
-  return allRides.map((ride) =>
-    mapRide(ride, passengersByRide.get(ride.id) ?? []),
-  );
+  // Passengers embedded — no separate batch query needed
+  return allRides.map((ride) => mapRide(ride, passengersFrom(ride)));
 }
 
 export async function searchRidesByRouteServer(
