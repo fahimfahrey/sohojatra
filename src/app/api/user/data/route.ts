@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit/server";
 import { logDataAccess } from "@/lib/audit";
+import { withTiming, timedQuery } from "@/lib/perf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withTiming("api.user.data.export", async (req: Request) => {
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     req.headers.get("x-real-ip") ??
@@ -46,12 +47,16 @@ export async function GET(req: Request) {
     );
   }
 
-  const [profile, ridesCreated, ridesJoined, notifications] = await Promise.all([
-    supabase.from("users").select("*").eq("id", user.id).maybeSingle(),
-    supabase.from("ride_requests").select("*").eq("creator_id", user.id),
-    supabase.from("ride_passengers").select("*").eq("user_id", user.id),
-    supabase.from("notifications").select("*").eq("user_id", user.id),
-  ]);
+  const [profile, ridesCreated, ridesJoined, notifications] = await timedQuery(
+    "user.data.export.fanout",
+    () =>
+      Promise.all([
+        supabase.from("users").select("*").eq("id", user.id).maybeSingle(),
+        supabase.from("ride_requests").select("*").eq("creator_id", user.id),
+        supabase.from("ride_passengers").select("*").eq("user_id", user.id),
+        supabase.from("notifications").select("*").eq("user_id", user.id),
+      ]),
+  );
 
   const firstError =
     profile.error || ridesCreated.error || ridesJoined.error || notifications.error;
@@ -108,4 +113,4 @@ export async function GET(req: Request) {
       "Cache-Control": "no-store",
     },
   });
-}
+});

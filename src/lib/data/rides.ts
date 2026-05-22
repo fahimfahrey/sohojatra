@@ -87,53 +87,33 @@ export async function searchRidesByRouteServer(
   radiusKm = 1,
   vehicleType?: VehicleType | null,
 ): Promise<RideRequest[]> {
-  const radiusDegrees = radiusKm / 111;
+  // DB-level bounding-box geo filter + passenger join in one query.
+  // Requires: SUPABASE_PERFORMANCE_OPTIMIZATIONS.sql → search_rides_by_route RPC.
+  const { data, error } = await supabase.rpc("search_rides_by_route", {
+    p_start_lat: startLat,
+    p_start_lng: startLng,
+    p_dest_lat: destLat,
+    p_dest_lng: destLng,
+    p_radius_degrees: radiusKm / 111,
+    p_vehicle_type: vehicleType ?? null,
+  });
 
-  let query = supabase
-    .from("ride_requests")
-    .select(
-      "id, creator_id, starting_point, destination, seats_available, total_seats, status, created_at, vehicle, contact_phone",
-    )
-    .eq("status", "open");
-
-  if (vehicleType) {
-    query = query.eq("vehicle", vehicleType);
-  }
-
-  const { data, error } = await query;
   if (error) throw error;
 
-  const matchingRides = (data ?? []).filter((ride) => {
-    const startPoint = ride.starting_point as Location;
-    const destPoint = ride.destination as Location;
-
-    const startDistance = Math.sqrt(
-      Math.pow(startPoint.coordinates.lat - startLat, 2) +
-        Math.pow(startPoint.coordinates.lng - startLng, 2),
-    );
-    const destDistance = Math.sqrt(
-      Math.pow(destPoint.coordinates.lat - destLat, 2) +
-        Math.pow(destPoint.coordinates.lng - destLng, 2),
-    );
-
-    return startDistance <= radiusDegrees && destDistance <= radiusDegrees;
-  });
-
-  const matchingIds = matchingRides.map((r) => r.id);
-  const { data: allPassengers } = await supabase
-    .from("ride_passengers")
-    .select("ride_id, user_id")
-    .in("ride_id", matchingIds);
-
-  const passengersByRide = new Map<string, string[]>();
-  (allPassengers ?? []).forEach((p) => {
-    const list = passengersByRide.get(p.ride_id) ?? [];
-    list.push(p.user_id);
-    passengersByRide.set(p.ride_id, list);
-  });
-
-  return matchingRides.map((ride) =>
-    mapRide(ride, passengersByRide.get(ride.id) ?? []),
+  return (data ?? []).map(
+    (row: {
+      id: string;
+      creator_id: string;
+      starting_point: Location;
+      destination: Location;
+      seats_available: number;
+      total_seats: number;
+      status: string;
+      created_at: string;
+      vehicle: string;
+      contact_phone?: string;
+      passenger_ids: string[];
+    }) => mapRide(row, row.passenger_ids ?? []),
   );
 }
 
@@ -142,22 +122,16 @@ export async function fetchRideByIdServer(
   rideId: string,
   userId: string | null,
 ): Promise<RideRequest | null> {
+  // Single query: ride + embedded passengers
   const { data: ride, error } = await supabase
     .from("ride_requests")
-    .select(
-      "id, creator_id, starting_point, destination, seats_available, total_seats, status, created_at, vehicle, contact_phone",
-    )
+    .select(RIDE_FIELDS)
     .eq("id", rideId)
     .single();
 
   if (error || !ride) return null;
 
-  const { data: passengers } = await supabase
-    .from("ride_passengers")
-    .select("user_id")
-    .eq("ride_id", rideId);
-
-  const passengerIds = passengers?.map((p) => p.user_id) ?? [];
+  const passengerIds = passengersFrom(ride);
   const isParticipant =
     !!userId &&
     (ride.creator_id === userId || passengerIds.includes(userId));
