@@ -129,21 +129,22 @@ export async function searchRidesByRouteServer(
     return startDistance <= radiusDegrees && destDistance <= radiusDegrees;
   });
 
-  const ridesWithPassengers = await Promise.all(
-    matchingRides.map(async (ride) => {
-      const { data: passengers } = await supabase
-        .from("ride_passengers")
-        .select("user_id")
-        .eq("ride_id", ride.id);
+  const matchingIds = matchingRides.map((r) => r.id);
+  const { data: allPassengers } = await supabase
+    .from("ride_passengers")
+    .select("ride_id, user_id")
+    .in("ride_id", matchingIds);
 
-      return mapRide(
-        ride,
-        passengers?.map((p) => p.user_id) ?? [],
-      );
-    }),
+  const passengersByRide = new Map<string, string[]>();
+  (allPassengers ?? []).forEach((p) => {
+    const list = passengersByRide.get(p.ride_id) ?? [];
+    list.push(p.user_id);
+    passengersByRide.set(p.ride_id, list);
+  });
+
+  return matchingRides.map((ride) =>
+    mapRide(ride, passengersByRide.get(ride.id) ?? []),
   );
-
-  return ridesWithPassengers;
 }
 
 export async function fetchRideByIdServer(
