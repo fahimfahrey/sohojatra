@@ -41,7 +41,7 @@ async function deriveKey(): Promise<Uint8Array> {
 
     const baseKey = await subtle.importKey(
       "raw",
-      naclUtil.decodeUTF8(SECRET),
+      naclUtil.decodeUTF8(SECRET) as BufferSource,
       { name: "PBKDF2" },
       false,
       ["deriveBits"],
@@ -50,7 +50,7 @@ async function deriveKey(): Promise<Uint8Array> {
     const bits = await subtle.deriveBits(
       {
         name: "PBKDF2",
-        salt: SALT,
+        salt: SALT as BufferSource,
         iterations: PBKDF2_ITERATIONS,
         hash: "SHA-256",
       },
