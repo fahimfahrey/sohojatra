@@ -54,6 +54,50 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 };
 
+function generateNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function buildCsp(nonce: string): string {
+  const isDev = process.env.NODE_ENV !== "production";
+  // 'strict-dynamic' lets nonce'd Next framework scripts load further chunks
+  // without an explicit allowlist. 'unsafe-eval' + ws: are required for
+  // Turbopack/HMR in dev only.
+  const scriptSrc = [
+    "'self'",
+    `'nonce-${nonce}'`,
+    "'strict-dynamic'",
+    isDev ? "'unsafe-eval'" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const connectSrc = [
+    "'self'",
+    "https:",
+    "https://*.sentry.io",
+    "https://*.ingest.sentry.io",
+    isDev ? "ws:" : "",
+    isDev ? "wss:" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' https: data:",
+    `connect-src ${connectSrc}`,
+    "worker-src 'self' blob:",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+}
+
 const ALLOWED_ORIGIN = (() => {
   const raw = process.env.NEXT_PUBLIC_SITE_URL;
   if (!raw) return null;
@@ -68,10 +112,14 @@ const CORS_ALLOWED_METHODS = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
 const CORS_ALLOWED_HEADERS = "Content-Type, Authorization, X-Requested-With";
 const CORS_MAX_AGE = "86400";
 
-function applySecurityHeaders(response: NextResponse): NextResponse {
+function applySecurityHeaders(
+  response: NextResponse,
+  csp?: string,
+): NextResponse {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     response.headers.set(key, value);
   }
+  if (csp) response.headers.set("Content-Security-Policy", csp);
   return response;
 }
 
@@ -195,19 +243,24 @@ function isApiKeyAuth(request: NextRequest): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  const nonce = generateNonce();
+  const csp = buildCsp(nonce);
+  request.headers.set("x-nonce", nonce);
+  const applySec = (res: NextResponse) => applySecurityHeaders(res, csp);
+
   const httpsRedirect = enforceHttps(request);
-  if (httpsRedirect) return applySecurityHeaders(httpsRedirect);
+  if (httpsRedirect) return applySec(httpsRedirect);
 
   attachClientContext(request);
 
   const corsResponse = handleCors(request);
-  if (corsResponse) return applySecurityHeaders(corsResponse);
+  if (corsResponse) return applySec(corsResponse);
 
   const rejection = validateApiRequest(request);
   if (rejection) {
     const origin = request.headers.get("origin");
     if (origin && origin === ALLOWED_ORIGIN) applyCorsHeaders(rejection, origin);
-    return applySecurityHeaders(rejection);
+    return applySec(rejection);
   }
 
   const isApi = request.nextUrl.pathname.startsWith("/api/");
@@ -227,7 +280,7 @@ export async function middleware(request: NextRequest) {
       );
       const origin = request.headers.get("origin");
       if (origin && origin === ALLOWED_ORIGIN) applyCorsHeaders(reply, origin);
-      return applySecurityHeaders(reply);
+      return applySec(reply);
     }
 
     const rl = await consumeRateLimit(
@@ -243,7 +296,7 @@ export async function middleware(request: NextRequest) {
       applyRateLimitHeaders(limited, rl);
       const origin = request.headers.get("origin");
       if (origin && origin === ALLOWED_ORIGIN) applyCorsHeaders(limited, origin);
-      return applySecurityHeaders(limited);
+      return applySec(limited);
     }
 
     request.headers.set("x-api-key-id", verified.record.id);
@@ -260,7 +313,7 @@ export async function middleware(request: NextRequest) {
     applyRateLimitHeaders(apiResponse, rl);
     const origin = request.headers.get("origin");
     if (origin && origin === ALLOWED_ORIGIN) applyCorsHeaders(apiResponse, origin);
-    return applySecurityHeaders(apiResponse);
+    return applySec(apiResponse);
   }
 
   const { response, userId } = await updateSession(request);
@@ -275,7 +328,7 @@ export async function middleware(request: NextRequest) {
       applyRateLimitHeaders(limited, rl);
       const origin = request.headers.get("origin");
       if (origin && origin === ALLOWED_ORIGIN) applyCorsHeaders(limited, origin);
-      return applySecurityHeaders(limited);
+      return applySec(limited);
     }
     applyRateLimitHeaders(response, rl);
   }
@@ -285,7 +338,7 @@ export async function middleware(request: NextRequest) {
   if (origin && origin === ALLOWED_ORIGIN && isApi) {
     applyCorsHeaders(response, origin);
   }
-  return applySecurityHeaders(response);
+  return applySec(response);
 }
 
 export const config = {

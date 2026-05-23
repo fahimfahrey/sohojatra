@@ -152,18 +152,29 @@ async function checkSupabaseKeyAuthorized() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return fail("supabase-key-authorized", "missing URL or key");
+  // PostgREST `/rest/v1/` root is service_role-only, so it 401s even for valid
+  // anon keys. Probe a nonexistent RPC instead: a valid anon key gets a 404
+  // PGRST202 from the schema lookup, an invalid key gets 401 from auth.
   try {
-    const res = await fetchWithTimeout(`${url}/rest/v1/`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
-    });
+    const res = await fetchWithTimeout(
+      `${url}/rest/v1/rpc/__validator_probe_nonexistent__`,
+      {
+        method: "POST",
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      },
+    );
     if (res.status === 401 || res.status === 403) {
       return fail(
         "supabase-key-authorized",
         `PostgREST rejected key (${res.status}) — wrong project or revoked`,
       );
     }
-    // PostgREST root returns 200 with the OpenAPI schema when authorized.
-    if (!res.ok && res.status !== 404) {
+    if (res.status !== 404 && !res.ok) {
       return fail(
         "supabase-key-authorized",
         `unexpected status ${res.status}`,

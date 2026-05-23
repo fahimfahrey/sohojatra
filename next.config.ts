@@ -36,11 +36,6 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(self)",
           },
-          {
-            key: "Content-Security-Policy",
-            value:
-              "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https: https://*.sentry.io https://*.ingest.sentry.io; worker-src 'self' blob:",
-          },
           { key: "Cache-Control", value: "no-cache" },
         ],
       },
