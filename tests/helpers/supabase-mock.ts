@@ -53,6 +53,14 @@ export function buildSupabaseMock(opts: {
         data: { user: opts.user ?? null },
         error: opts.authError ?? null,
       })),
+      resetPasswordForEmail: vi.fn(async () => ({
+        data: {},
+        error: opts.authError ?? null,
+      })),
+      updateUser: vi.fn(async () => ({
+        data: { user: opts.user ?? null },
+        error: opts.authError ?? null,
+      })),
     },
     from: vi.fn(tableMock),
     rpc: vi.fn(async () =>

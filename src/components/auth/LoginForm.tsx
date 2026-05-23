@@ -8,7 +8,13 @@ import type { ActionResult } from "@/lib/validation/schemas";
 
 const initialState: ActionResult | null = null;
 
-export default function LoginForm({ nextPath }: { nextPath?: string }) {
+export default function LoginForm({
+  nextPath,
+  reset,
+}: {
+  nextPath?: string;
+  reset?: boolean;
+}) {
   const [state, formAction, pending] = useActionState(signInAction, initialState);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -39,6 +45,15 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
           <span className="px-3 text-xs text-gray-400 uppercase">or</span>
           <div className="flex-1 h-px bg-gray-200" />
         </div>
+
+        {reset && (
+          <p
+            className="text-sm text-emerald-700 bg-emerald-50 rounded-xl px-4 py-3 mb-5"
+            role="status"
+          >
+            Password updated. Sign in with your new password.
+          </p>
+        )}
 
         <form action={formAction} className="space-y-5">
           {nextPath ? <input type="hidden" name="next" value={nextPath} /> : null}
@@ -72,12 +87,20 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
           </div>
 
           <div>
-            <label
-              className="block text-gray-700 text-sm font-semibold mb-2"
-              htmlFor="password"
-            >
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label
+                className="block text-gray-700 text-sm font-semibold"
+                htmlFor="password"
+              >
+                Password
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-xs font-semibold text-accent-600 hover:text-accent-500"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input

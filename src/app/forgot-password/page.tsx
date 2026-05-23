@@ -1,24 +1,18 @@
 import type { Metadata } from "next";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import LoginForm from "@/components/auth/LoginForm";
+import ForgotPasswordForm from "@/components/auth/ForgotPasswordForm";
 
 export const metadata: Metadata = {
-  title: "Login",
+  title: "Forgot password",
 };
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ next?: string; reset?: string }>;
-}) {
-  const { next, reset } = await searchParams;
-
+export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Header />
       <main className="flex-grow flex items-center py-8 px-4">
-        <LoginForm nextPath={next} reset={reset === "ok"} />
+        <ForgotPasswordForm />
       </main>
       <Footer />
     </div>
