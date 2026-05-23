@@ -18,11 +18,18 @@ import {
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { checkRateLimit } from "@/lib/rate-limit/server";
 import { logAuditEvent } from "@/lib/audit";
+import { requireFreshTotp } from "@/lib/auth/require-fresh-totp";
 import type { RideRequest, VehicleType } from "@/types";
 
 const CSRF_ERROR: ActionResult<never> = {
   success: false,
   error: "Invalid or missing CSRF token",
+};
+
+const STEPUP_ERROR: ActionResult<never> = {
+  success: false,
+  error: "2FA verification required",
+  code: "2FA_STEPUP_REQUIRED",
 };
 
 export async function getUserRidesAction(): Promise<ActionResult<RideRequest[]>> {
@@ -172,6 +179,8 @@ export async function createRideAction(
         error: "Please verify your email before creating a ride",
       };
     }
+    const stepup = await requireFreshTotp(user);
+    if (!stepup.ok) return STEPUP_ERROR;
     const parsed = createRideSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: "Invalid ride data" };
@@ -251,6 +260,8 @@ export async function joinRideAction(
     if (!(await checkRateLimit(`join:${user.id}`, 10, 60 * 1000))) {
       return { success: false, error: "Too many join attempts. Please slow down." };
     }
+    const stepup = await requireFreshTotp(user);
+    if (!stepup.ok) return STEPUP_ERROR;
     const parsed = joinRideSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: "Invalid join request" };

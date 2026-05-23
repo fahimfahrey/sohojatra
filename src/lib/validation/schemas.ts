@@ -149,6 +149,19 @@ export const searchRidesSchema = z.object({
   vehicle: vehicleTypeSchema.optional().nullable(),
 });
 
+export const totpCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^[0-9]{6}$/, "Enter the 6-digit code from your authenticator");
+
+export const recoveryCodeSchema = z
+  .string()
+  .trim()
+  .transform((s) => s.replace(/[\s-]/g, "").toUpperCase())
+  .pipe(z.string().regex(/^[A-Z0-9]{8}$/, "Invalid recovery code"));
+
+export type TotpStepUpErrorCode = "2FA_STEPUP_REQUIRED";
+
 export type ActionResult<T = void> =
   | { success: true; data?: T }
-  | { success: false; error: string };
+  | { success: false; error: string; code?: TotpStepUpErrorCode };

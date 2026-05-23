@@ -1,5 +1,9 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  TOTP_PASSED_COOKIE,
+  verifyTotpPassedCookie,
+} from "@/lib/auth/totp-cookies";
 
 const SESSION_IDLE_MS = 30 * 60 * 1000;
 const ACTIVITY_COOKIE = "sb-last-activity";
@@ -60,6 +64,8 @@ export async function updateSession(
     pathname.startsWith("/register") ||
     pathname.startsWith("/auth");
 
+  const is2faRoute = pathname.startsWith("/2fa");
+
   const isRideDetailPage = /^\/rides\/[^/]+$/.test(pathname);
 
   const isProtected =
@@ -113,6 +119,22 @@ export async function updateSession(
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/email-confirmation";
+    return { response: NextResponse.redirect(url), userId: user.id };
+  }
+
+  if (
+    user &&
+    user.app_metadata?.totp_enabled === true &&
+    isProtected &&
+    !is2faRoute &&
+    !verifyTotpPassedCookie(
+      request.cookies.get(TOTP_PASSED_COOKIE)?.value,
+      user.id,
+    )
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/2fa/challenge";
+    url.searchParams.set("next", pathname);
     return { response: NextResponse.redirect(url), userId: user.id };
   }
 

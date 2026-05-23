@@ -1,11 +1,15 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit/server";
 import { logAuditEvent } from "@/lib/audit";
+import {
+  TOTP_PASSED_COOKIE,
+  TOTP_STEPUP_COOKIE,
+} from "@/lib/auth/totp-cookies";
 import {
   signInSchema,
   signUpSchema,
@@ -189,6 +193,9 @@ export async function signOutAction(): Promise<void> {
     data: { user },
   } = await supabase.auth.getUser();
   await supabase.auth.signOut();
+  const store = await cookies();
+  store.delete(TOTP_PASSED_COOKIE);
+  store.delete(TOTP_STEPUP_COOKIE);
   await logAuditEvent({
     action: "auth.signout",
     outcome: "success",
