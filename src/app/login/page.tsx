@@ -10,15 +10,15 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; reset?: string }>;
 }) {
-  const { next } = await searchParams;
+  const { next, reset } = await searchParams;
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Header />
       <main className="flex-grow flex items-center py-8 px-4">
-        <LoginForm nextPath={next} />
+        <LoginForm nextPath={next} reset={reset === "ok"} />
       </main>
       <Footer />
     </div>
