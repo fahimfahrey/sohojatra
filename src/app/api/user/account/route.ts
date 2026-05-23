@@ -33,7 +33,7 @@ export const DELETE = withTiming("api.user.account.delete", async (req: Request)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!checkRateLimit(`delete:${user.id}`, 3, 60 * 60 * 1000)) {
+  if (!(await checkRateLimit(`delete:${user.id}`, 3, 60 * 60 * 1000))) {
     logDataAccess({
       event: "user.account.delete",
       userId: user.id,

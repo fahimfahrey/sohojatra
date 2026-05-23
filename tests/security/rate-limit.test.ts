@@ -19,26 +19,26 @@ describe("A07 rate-limit primitive", () => {
   it("allows up to maxAttempts then rejects", async () => {
     const checkRateLimit = await freshRateLimit();
     for (let i = 0; i < 5; i++) {
-      expect(checkRateLimit("k1", 5, 60_000)).toBe(true);
+      expect(await checkRateLimit("k1", 5, 60_000)).toBe(true);
     }
-    expect(checkRateLimit("k1", 5, 60_000)).toBe(false);
-    expect(checkRateLimit("k1", 5, 60_000)).toBe(false);
+    expect(await checkRateLimit("k1", 5, 60_000)).toBe(false);
+    expect(await checkRateLimit("k1", 5, 60_000)).toBe(false);
   });
 
   it("keys are isolated (one IP rate-limited does not block another)", async () => {
     const checkRateLimit = await freshRateLimit();
-    for (let i = 0; i < 5; i++) checkRateLimit("ip:a", 5, 60_000);
-    expect(checkRateLimit("ip:a", 5, 60_000)).toBe(false);
-    expect(checkRateLimit("ip:b", 5, 60_000)).toBe(true);
+    for (let i = 0; i < 5; i++) await checkRateLimit("ip:a", 5, 60_000);
+    expect(await checkRateLimit("ip:a", 5, 60_000)).toBe(false);
+    expect(await checkRateLimit("ip:b", 5, 60_000)).toBe(true);
   });
 
   it("resets after window elapses", async () => {
     vi.useFakeTimers();
     const checkRateLimit = await freshRateLimit();
-    for (let i = 0; i < 3; i++) checkRateLimit("k2", 3, 1000);
-    expect(checkRateLimit("k2", 3, 1000)).toBe(false);
+    for (let i = 0; i < 3; i++) await checkRateLimit("k2", 3, 1000);
+    expect(await checkRateLimit("k2", 3, 1000)).toBe(false);
     vi.advanceTimersByTime(1500);
-    expect(checkRateLimit("k2", 3, 1000)).toBe(true);
+    expect(await checkRateLimit("k2", 3, 1000)).toBe(true);
     vi.useRealTimers();
   });
 });

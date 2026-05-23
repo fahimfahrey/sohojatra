@@ -16,6 +16,7 @@ import {
   fetchRideByIdServer,
 } from "@/lib/data/rides";
 import { validateCsrfToken } from "@/lib/security/csrf";
+import { checkRateLimit } from "@/lib/rate-limit/server";
 import type { RideRequest, VehicleType } from "@/types";
 
 const CSRF_ERROR: ActionResult<never> = {
@@ -43,7 +44,10 @@ export async function searchRidesAction(input: {
   vehicle?: VehicleType | null;
 }): Promise<ActionResult<RideRequest[]>> {
   try {
-    await requireUser();
+    const user = await requireUser();
+    if (!(await checkRateLimit(`search:${user.id}`, 30, 60 * 1000))) {
+      return { success: false, error: "Too many searches. Please slow down." };
+    }
     const parsed = searchRidesSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: "Invalid search parameters" };
@@ -192,6 +196,9 @@ export async function joinRideAction(
   try {
     if (!(await validateCsrfToken(csrfToken))) return CSRF_ERROR;
     const user = await requireUser();
+    if (!(await checkRateLimit(`join:${user.id}`, 10, 60 * 1000))) {
+      return { success: false, error: "Too many join attempts. Please slow down." };
+    }
     const parsed = joinRideSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: "Invalid join request" };
