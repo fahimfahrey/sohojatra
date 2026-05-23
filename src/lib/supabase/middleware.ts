@@ -1,5 +1,18 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+
+const SESSION_IDLE_MS = 30 * 60 * 1000;
+const ACTIVITY_COOKIE = "sb-last-activity";
+
+function secureCookieOptions(options: CookieOptions = {}): CookieOptions {
+  return {
+    ...options,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: options.path ?? "/",
+  };
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -18,7 +31,11 @@ export async function updateSession(request: NextRequest) {
           });
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) => {
-            supabaseResponse.cookies.set(name, value, options);
+            supabaseResponse.cookies.set(
+              name,
+              value,
+              secureCookieOptions(options),
+            );
           });
         },
       },
@@ -29,6 +46,7 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const now = Date.now();
   const pathname = request.nextUrl.pathname;
   const isAuthRoute =
     pathname.startsWith("/login") ||
@@ -42,6 +60,29 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/create-ride") ||
     pathname === "/rides" ||
     pathname.startsWith("/email-confirmation");
+
+  if (user) {
+    const lastRaw = request.cookies.get(ACTIVITY_COOKIE)?.value;
+    const last = lastRaw ? Number(lastRaw) : NaN;
+    const expired = Number.isFinite(last) && now - last > SESSION_IDLE_MS;
+
+    if (expired) {
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
+      url.searchParams.set("reason", "timeout");
+      const redirect = NextResponse.redirect(url);
+      redirect.cookies.delete(ACTIVITY_COOKIE);
+      return redirect;
+    }
+
+    supabaseResponse.cookies.set(
+      ACTIVITY_COOKIE,
+      String(now),
+      secureCookieOptions({ maxAge: SESSION_IDLE_MS / 1000 }),
+    );
+  }
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
