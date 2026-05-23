@@ -17,6 +17,7 @@ import {
 } from "@/lib/data/rides";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { checkRateLimit } from "@/lib/rate-limit/server";
+import { logAuditEvent } from "@/lib/audit";
 import type { RideRequest, VehicleType } from "@/types";
 
 const CSRF_ERROR: ActionResult<never> = {
@@ -106,9 +107,15 @@ export async function getCreatorPhoneAction(
   rideId: string,
 ): Promise<ActionResult<{ phone: string }>> {
   try {
-    await requireUser();
+    const user = await requireUser();
     const parsed = rideIdSchema.safeParse({ rideId });
     if (!parsed.success) {
+      await logAuditEvent({
+        action: "phone.access",
+        outcome: "failure",
+        userId: user.id,
+        detail: { reason: "invalid_ride_id" },
+      });
       return { success: false, error: "Invalid ride" };
     }
 
@@ -118,12 +125,33 @@ export async function getCreatorPhoneAction(
     });
 
     if (error) {
+      await logAuditEvent({
+        action: "phone.access",
+        outcome: "failure",
+        userId: user.id,
+        resourceId: parsed.data.rideId,
+        detail: { reason: "rpc_error", code: error.code ?? null },
+      });
       return { success: false, error: "Access denied" };
     }
 
     if (!data) {
+      await logAuditEvent({
+        action: "phone.access",
+        outcome: "failure",
+        userId: user.id,
+        resourceId: parsed.data.rideId,
+        detail: { reason: "no_phone" },
+      });
       return { success: false, error: "Creator phone not available" };
     }
+
+    await logAuditEvent({
+      action: "phone.access",
+      outcome: "success",
+      userId: user.id,
+      resourceId: parsed.data.rideId,
+    });
 
     return { success: true, data: { phone: data as string } };
   } catch {
@@ -166,6 +194,12 @@ export async function createRideAction(
       .single();
 
     if (error || !data) {
+      await logAuditEvent({
+        action: "ride.create",
+        outcome: "failure",
+        userId: user.id,
+        detail: { reason: "db_error" },
+      });
       return { success: false, error: "Failed to create ride" };
     }
 
@@ -178,8 +212,26 @@ export async function createRideAction(
       });
 
     if (passengerError) {
+      await logAuditEvent({
+        action: "ride.create",
+        outcome: "failure",
+        userId: user.id,
+        resourceId: data.id,
+        detail: { reason: "passenger_insert_failed" },
+      });
       return { success: false, error: "Failed to register as passenger" };
     }
+
+    await logAuditEvent({
+      action: "ride.create",
+      outcome: "success",
+      userId: user.id,
+      resourceId: data.id,
+      detail: {
+        vehicle: parsed.data.vehicle,
+        total_seats: parsed.data.totalSeats,
+      },
+    });
 
     revalidatePath("/dashboard");
     revalidatePath("/rides");
@@ -236,6 +288,13 @@ export async function joinRideAction(
       });
 
     if (passengerError) {
+      await logAuditEvent({
+        action: "ride.join",
+        outcome: "failure",
+        userId: user.id,
+        resourceId: parsed.data.rideId,
+        detail: { reason: "passenger_insert_failed" },
+      });
       return { success: false, error: "Failed to join ride" };
     }
 
@@ -249,6 +308,14 @@ export async function joinRideAction(
         status: newStatus,
       })
       .eq("id", parsed.data.rideId);
+
+    await logAuditEvent({
+      action: "ride.join",
+      outcome: "success",
+      userId: user.id,
+      resourceId: parsed.data.rideId,
+      detail: { creator_id: ride.creator_id, new_status: newStatus },
+    });
 
     revalidatePath("/dashboard");
     revalidatePath(`/rides/${parsed.data.rideId}`);
@@ -305,6 +372,13 @@ export async function cancelRideAction(
         .update({ status: "cancelled" })
         .eq("id", parsed.data.rideId)
         .eq("creator_id", user.id);
+      await logAuditEvent({
+        action: "ride.cancel",
+        outcome: "success",
+        userId: user.id,
+        resourceId: parsed.data.rideId,
+        detail: { role: "creator" },
+      });
     } else {
       if (ride.status === "completed" || ride.status === "cancelled") {
         return { success: false, error: "Cannot leave this ride" };
@@ -331,6 +405,13 @@ export async function cancelRideAction(
           })
           .eq("id", parsed.data.rideId);
       }
+      await logAuditEvent({
+        action: "ride.cancel",
+        outcome: "success",
+        userId: user.id,
+        resourceId: parsed.data.rideId,
+        detail: { role: "passenger" },
+      });
     }
 
     revalidatePath("/dashboard");
@@ -361,8 +442,22 @@ export async function completeRideAction(
       .eq("creator_id", user.id);
 
     if (error) {
+      await logAuditEvent({
+        action: "ride.complete",
+        outcome: "failure",
+        userId: user.id,
+        resourceId: parsed.data.rideId,
+        detail: { reason: "db_error" },
+      });
       return { success: false, error: "Failed to complete ride" };
     }
+
+    await logAuditEvent({
+      action: "ride.complete",
+      outcome: "success",
+      userId: user.id,
+      resourceId: parsed.data.rideId,
+    });
 
     revalidatePath("/dashboard");
     revalidatePath(`/rides/${parsed.data.rideId}`);
