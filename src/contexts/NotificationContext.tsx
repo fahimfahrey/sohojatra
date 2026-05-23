@@ -1,9 +1,17 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import type { NotificationMessage } from "@/types";
 import { useAuth } from "./AuthContext";
 import { useAbly } from "./AblyContext";
+import { getBreaker, readCache, writeCache } from "@/lib/resilient-fetch";
+import { CircuitOpenError } from "@/lib/circuit-breaker";
 import {
   getNotificationsAction,
   markNotificationReadAction,
@@ -14,6 +22,7 @@ import {
 interface NotificationContextType {
   notifications: NotificationMessage[];
   unreadCount: number;
+  stale: boolean;
   addNotification: (
     message: string,
     type: NotificationMessage["type"],
@@ -27,6 +36,9 @@ const NotificationContext = createContext<NotificationContextType | undefined>(
   undefined,
 );
 
+const POLL_INTERVAL_MS = 20_000;
+const notifCacheKey = (userId: string) => `coshare.notifications.${userId}`;
+
 export function NotificationProvider({
   children,
   initialNotifications = [],
@@ -36,30 +48,67 @@ export function NotificationProvider({
 }) {
   const [notifications, setNotifications] =
     useState<NotificationMessage[]>(initialNotifications);
+  const [stale, setStale] = useState(false);
   const { user } = useAuth();
-  const { subscribeToEvent } = useAbly();
+  const { subscribeToEvent, connectionMode } = useAbly();
 
-  const refresh = async () => {
-    const result = await getNotificationsAction();
-    if (result.success && result.data) {
-      setNotifications(result.data);
+  const refresh = useCallback(async () => {
+    if (!user) {
+      setNotifications([]);
+      setStale(false);
+      return;
     }
-  };
+    const breaker = getBreaker("supabase-notifications", {
+      failureThreshold: 3,
+      resetTimeoutMs: 30_000,
+    });
+    const cacheKey = notifCacheKey(user.id);
+
+    try {
+      const result = await breaker.execute(() => getNotificationsAction());
+      if (result.success && result.data) {
+        setNotifications(result.data);
+        setStale(false);
+        writeCache(cacheKey, result.data);
+      } else {
+        throw new Error(result.success ? "empty response" : result.error);
+      }
+    } catch (err) {
+      if (!(err instanceof CircuitOpenError)) {
+        console.warn("[notifications] refresh failed, serving cache", err);
+      }
+      const cached = readCache<NotificationMessage[]>(cacheKey);
+      if (cached) {
+        setNotifications(cached);
+      }
+      setStale(true);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
       setNotifications([]);
+      setStale(false);
       return;
     }
     refresh();
-  }, [user?.id]);
+  }, [user?.id, refresh]);
 
   useEffect(() => {
     if (!user) return;
     return subscribeToEvent(`notifications:${user.id}`, "new", () => {
       refresh();
     });
-  }, [user?.id, subscribeToEvent]);
+  }, [user?.id, subscribeToEvent, refresh]);
+
+  // Polling fallback when Ably is unavailable.
+  useEffect(() => {
+    if (!user || connectionMode !== "polling") return;
+    const id = setInterval(() => {
+      refresh();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [user, connectionMode, refresh]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -93,6 +142,7 @@ export function NotificationProvider({
       value={{
         notifications,
         unreadCount,
+        stale,
         addNotification,
         markAsRead,
         markAllAsRead,

@@ -5,6 +5,8 @@ import type { RideRequest, Location, VehicleType } from "@/types";
 import { useAuth } from "./AuthContext";
 import { RIDES_CHANNEL, useAbly } from "./AblyContext";
 import { useCsrfToken } from "./CsrfContext";
+import { getBreaker, readCache, writeCache } from "@/lib/resilient-fetch";
+import { CircuitOpenError } from "@/lib/circuit-breaker";
 import {
   getUserRidesAction,
   searchRidesAction,
@@ -18,6 +20,7 @@ interface RideContextType {
   rides: RideRequest[];
   userRides: RideRequest[];
   loading: boolean;
+  stale: boolean;
   createRideRequest: (
     startingPoint: Location,
     destination: Location,
@@ -39,26 +42,53 @@ interface RideContextType {
 
 const RideContext = createContext<RideContextType | undefined>(undefined);
 
+const POLL_INTERVAL_MS = 15_000;
+const ridesCacheKey = (userId: string) => `coshare.rides.${userId}`;
+
 export function RideProvider({ children }: { children: React.ReactNode }) {
   const [rides, setRides] = useState<RideRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stale, setStale] = useState(false);
   const { user } = useAuth();
-  const { publishEvent, subscribeToEvent } = useAbly();
+  const { publishEvent, subscribeToEvent, connectionMode } = useAbly();
   const csrfToken = useCsrfToken();
 
   const refreshUserRides = useCallback(async () => {
     if (!user) {
       setRides([]);
+      setStale(false);
       setLoading(false);
       return;
     }
 
+    const breaker = getBreaker("supabase-rides", {
+      failureThreshold: 3,
+      resetTimeoutMs: 30_000,
+    });
+    const cacheKey = ridesCacheKey(user.id);
+
     setLoading(true);
-    const result = await getUserRidesAction();
-    if (result.success && result.data) {
-      setRides(result.data);
+    try {
+      const result = await breaker.execute(() => getUserRidesAction());
+      if (result.success && result.data) {
+        setRides(result.data);
+        setStale(false);
+        writeCache(cacheKey, result.data);
+      } else {
+        throw new Error(result.success ? "empty response" : result.error);
+      }
+    } catch (err) {
+      if (!(err instanceof CircuitOpenError)) {
+        console.warn("[rides] refresh failed, serving cache", err);
+      }
+      const cached = readCache<RideRequest[]>(cacheKey);
+      if (cached) {
+        setRides(cached);
+      }
+      setStale(true);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user]);
 
   useEffect(() => {
@@ -72,6 +102,15 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     });
     return unsub;
   }, [user, subscribeToEvent, refreshUserRides]);
+
+  // Polling fallback when Ably is unavailable.
+  useEffect(() => {
+    if (!user || connectionMode !== "polling") return;
+    const id = setInterval(() => {
+      refreshUserRides();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [user, connectionMode, refreshUserRides]);
 
   const createRideRequest = async (
     startingPoint: Location,
@@ -159,6 +198,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         rides,
         userRides: rides,
         loading,
+        stale,
         createRideRequest,
         joinRideRequest,
         cancelRideRequest,

@@ -8,6 +8,7 @@ import { AblyProvider } from "@/contexts/AblyContext";
 import { CsrfProvider } from "@/contexts/CsrfContext";
 import FloatingCallButton from "@/components/layout/FloatingCallButton";
 import { PWAInstallPrompt } from "@/components/shared/PWAInstallPrompt";
+import { StaleDataBanner } from "@/components/shared/StaleDataBanner";
 import type { UserType } from "@/types";
 import type { NotificationMessage } from "@/types";
 
@@ -42,6 +43,7 @@ export function AppProviders({
                 },
               }}
             />
+            <StaleDataBanner />
             {children}
             <FloatingCallButton />
             <PWAInstallPrompt />

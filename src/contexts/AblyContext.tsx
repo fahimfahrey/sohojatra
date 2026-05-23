@@ -4,19 +4,24 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import * as Ably from "ably";
 import { useAuth } from "./AuthContext";
+import { CircuitBreaker } from "@/lib/circuit-breaker";
 
 interface AblyMessage {
   name: string;
   data: Record<string, unknown>;
 }
 
+export type ConnectionMode = "realtime" | "polling" | "offline";
+
 interface AblyContextType {
   connected: boolean;
+  connectionMode: ConnectionMode;
   publishEvent: (
     channelName: string,
     eventName: string,
@@ -37,14 +42,24 @@ export const RIDES_CHANNEL = "rides";
 export function AblyProvider({ children }: { children: ReactNode }) {
   const [ably, setAbly] = useState<Ably.Realtime | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>("offline");
   const { user } = useAuth();
+  const breakerRef = useRef(
+    new CircuitBreaker("ably-connection", {
+      failureThreshold: 3,
+      resetTimeoutMs: 60_000,
+    }),
+  );
 
   useEffect(() => {
     let ablyInstance: Ably.Realtime | null = null;
+    const breaker = breakerRef.current;
 
     if (!user) {
       setAbly(null);
       setConnected(false);
+      setConnectionMode("offline");
+      breaker.reset();
       return;
     }
 
@@ -55,6 +70,7 @@ export function AblyProvider({ children }: { children: ReactNode }) {
         fetch("/api/ably/token", { credentials: "include" })
           .then(async (res) => {
             if (!res.ok) {
+              breaker.recordFailure();
               callback("Realtime token request failed", null);
               return;
             }
@@ -62,18 +78,35 @@ export function AblyProvider({ children }: { children: ReactNode }) {
           })
           .catch((err: Error) => {
             console.error("[ably/token] fetch failed", err);
+            breaker.recordFailure();
             callback("Realtime token request failed", null);
           });
       },
       autoConnect: true,
     });
 
-    const onConnected = () => setConnected(true);
-    const onDisconnected = () => setConnected(false);
-    const onFailed = () => setConnected(false);
+    const onConnected = () => {
+      breaker.recordSuccess();
+      setConnected(true);
+      setConnectionMode("realtime");
+    };
+    const onDisconnected = () => {
+      setConnected(false);
+    };
+    const onSuspended = () => {
+      breaker.recordFailure();
+      setConnected(false);
+      setConnectionMode("polling");
+    };
+    const onFailed = () => {
+      breaker.recordFailure();
+      setConnected(false);
+      setConnectionMode("polling");
+    };
 
     ablyInstance.connection.on("connected", onConnected);
     ablyInstance.connection.on("disconnected", onDisconnected);
+    ablyInstance.connection.on("suspended", onSuspended);
     ablyInstance.connection.on("failed", onFailed);
 
     setAbly(ablyInstance);
@@ -81,10 +114,12 @@ export function AblyProvider({ children }: { children: ReactNode }) {
     return () => {
       ablyInstance?.connection.off("connected", onConnected);
       ablyInstance?.connection.off("disconnected", onDisconnected);
+      ablyInstance?.connection.off("suspended", onSuspended);
       ablyInstance?.connection.off("failed", onFailed);
       ablyInstance?.close();
       setAbly(null);
       setConnected(false);
+      setConnectionMode("offline");
     };
   }, [user?.id]);
 
@@ -122,7 +157,14 @@ export function AblyProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AblyContext.Provider value={{ connected, publishEvent, subscribeToEvent }}>
+    <AblyContext.Provider
+      value={{
+        connected,
+        connectionMode,
+        publishEvent,
+        subscribeToEvent,
+      }}
+    >
       {children}
     </AblyContext.Provider>
   );
