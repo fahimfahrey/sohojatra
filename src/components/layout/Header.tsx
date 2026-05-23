@@ -6,16 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { signOutAction } from "@/app/actions/auth";
-import {
-  Bell,
-  Menu,
-  X,
-  User,
-  LogOut,
-  CheckCircle,
-  Info,
-  Users,
-} from "lucide-react";
+import { Bell, Menu, X, User, LogOut } from "lucide-react";
 import { useNotification } from "@/contexts/NotificationContext";
 import NotificationDropdown from "@/components/shared/NotificationDropdown";
 
@@ -42,7 +33,11 @@ const Header: React.FC = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 sm:h-20">
             <div className="flex items-center">
-              <Link href="/" className="flex-shrink-0 flex items-center">
+              <Link
+                href="/"
+                prefetch={false}
+                className="flex-shrink-0 flex items-center"
+              >
                 <Image
                   src="/sohojatra.png"
                   alt="Sohojatra"

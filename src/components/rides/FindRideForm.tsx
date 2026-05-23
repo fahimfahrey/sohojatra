@@ -5,7 +5,6 @@ import { Search, MapPin, Filter, Car, X } from "lucide-react";
 import { Location, RideRequest, VehicleType } from "../../types";
 import GlobalMap from "../map/MapLoader";
 import RideList from "./RideList";
-import VehicleSelector from "./VehicleSelector";
 
 const FindRideForm: React.FC = () => {
   const [startingPoint, setStartingPoint] = useState<Location | null>(null);
@@ -106,7 +105,11 @@ const FindRideForm: React.FC = () => {
     console.log("Setting up real-time ride update subscriptions");
 
     // Subscribe to all ride events that might affect our results
-    const unsubscribeNew = subscribeToEvent(RIDES_CHANNEL, "new", handleNewRide);
+    const unsubscribeNew = subscribeToEvent(
+      RIDES_CHANNEL,
+      "new",
+      handleNewRide,
+    );
     const unsubscribeUpdate = subscribeToEvent(
       RIDES_CHANNEL,
       "update",
@@ -138,25 +141,6 @@ const FindRideForm: React.FC = () => {
     // Only re-subscribe if subscribeToEvent changes (which should be stable)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscribeToEvent]);
-
-  // Refresh the ride list periodically
-  useEffect(() => {
-    if (!searched || !startingPoint || !destination) return;
-
-    console.log("Setting up periodic ride refresh interval");
-    const refreshInterval = setInterval(() => {
-      if (startingPoint && destination) {
-        refreshMatchingRides();
-      }
-    }, 10000); // Refresh every 10 seconds
-
-    return () => {
-      console.log("Cleaning up periodic refresh interval");
-      clearInterval(refreshInterval);
-    };
-    // Only depend on searched state, not on the refresh function itself
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searched]);
 
   const handleSearch = async () => {
     window.scrollTo({

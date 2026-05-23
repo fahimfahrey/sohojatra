@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Phone } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRide } from "../../contexts/RideContext";
@@ -23,7 +23,7 @@ interface AblyMessage {
 
 const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
   const { user } = useAuth();
-  const { rides, syncRideStatus } = useRide();
+  const { rides } = useRide();
   const { subscribeToEvent } = useAbly();
   const [creatorPhone, setCreatorPhone] = useState<string | undefined>(
     DEBUG_MODE ? "1234567890" : undefined,
@@ -31,6 +31,10 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
   const [showButton, setShowButton] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [activeRideId, setActiveRideId] = useState<string | null>(null);
+  const activeRideIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeRideIdRef.current = activeRideId;
+  }, [activeRideId]);
 
   // Add debug info
   const addDebugInfo = (info: string) => {
@@ -54,11 +58,7 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
       return;
     }
 
-    // If we have an activeRideId, sync it first to get latest status
-    if (activeRideId) {
-      addDebugInfo(`Syncing active ride status for ${activeRideId}`);
-      await syncRideStatus(activeRideId);
-    }
+    const currentActiveRideId = activeRideIdRef.current;
 
     // Get active rides where user is a passenger but not the creator
     let activeRides = [];
@@ -124,11 +124,12 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
       addDebugInfo("No active rides found where user is passenger");
     }
 
-    // Update state all at once
-    setCreatorPhone(phoneToUse);
-    setActiveRideId(rideIdToUse);
-    setShowButton(shouldShowButton);
-  }, [user, rides, rideId, activeRideId, syncRideStatus]);
+    // Update state only when changed to avoid render churn
+    setCreatorPhone((prev) => (prev === phoneToUse ? prev : phoneToUse));
+    setActiveRideId((prev) => (prev === rideIdToUse ? prev : rideIdToUse));
+    setShowButton((prev) => (prev === shouldShowButton ? prev : shouldShowButton));
+    void currentActiveRideId;
+  }, [user, rides, rideId]);
 
   // Subscribe to real-time ride updates
   useEffect(() => {
@@ -155,27 +156,20 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
 
       addDebugInfo(`Received update for ride ${rideId} with status ${status}`);
 
-      // If this is our active ride and it's completed or cancelled, hide the button immediately
-      if (activeRideId === rideId) {
-        addDebugInfo(`This is our active ride! (${activeRideId})`);
+      const currentActiveRideId = activeRideIdRef.current;
+      if (currentActiveRideId === rideId) {
+        addDebugInfo(`This is our active ride! (${currentActiveRideId})`);
 
         if (status === "completed" || status === "cancelled") {
           addDebugInfo(
             `Active ride ${rideId} status changed to ${status} - hiding button immediately`,
           );
 
-          // Force direct state updates to ensure immediate hiding
           setShowButton(false);
           setCreatorPhone(undefined);
           setActiveRideId(null);
         }
       }
-
-      // Always re-check for active rides when we get any update
-      setTimeout(() => {
-        addDebugInfo(`Checking for active rides after status update event`);
-        checkForActiveRides();
-      }, 100); // Small delay to ensure DB has processed updates
     };
 
     // Subscribe to event types that could affect our button
@@ -203,23 +197,13 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
       handleRideUpdate,
     );
 
-    // Add a periodic check to ensure button state is correct
-    const intervalId = setInterval(() => {
-      if (activeRideId) {
-        addDebugInfo(`Periodic check for ride ${activeRideId}`);
-        checkForActiveRides();
-      }
-    }, 5000); // Check every 5 seconds
-
     return () => {
-      // Clean up subscriptions when component unmounts
       unsubscribeUpdate();
       unsubscribeComplete();
       unsubscribeCancel();
       unsubscribeLeave();
-      clearInterval(intervalId);
     };
-  }, [user, activeRideId, checkForActiveRides]);
+  }, [user, subscribeToEvent]);
 
   // Debug useEffect to log the current state
   useEffect(() => {

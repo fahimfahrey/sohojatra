@@ -2,8 +2,10 @@
 
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -146,81 +148,94 @@ export function AblyProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   const publishQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const ablyRef = useRef<Ably.Realtime | null>(null);
+  useEffect(() => {
+    ablyRef.current = ably;
+  }, [ably]);
 
-  const publishEvent = (
-    channelName: string,
-    eventName: string,
-    data: Record<string, unknown>,
-  ) => {
-    if (!ably || ably.connection.state !== "connected") return;
+  const publishEvent = useCallback(
+    (
+      channelName: string,
+      eventName: string,
+      data: Record<string, unknown>,
+    ) => {
+      const instance = ablyRef.current;
+      if (!instance || instance.connection.state !== "connected") return;
 
-    publishQueueRef.current = publishQueueRef.current
-      .catch(() => undefined)
-      .then(async () => {
-        try {
-          const ciphertext = await encryptRealTimeData(data);
-          const envelope: EncryptedEnvelope = {
-            __enc: ENVELOPE_VERSION,
-            p: ciphertext,
-          };
-          ably.channels.get(channelName).publish(eventName, envelope);
-        } catch (err) {
-          logger.warn("[ably] publish encryption failed", {
-            channel: channelName,
-            event: eventName,
-            error: (err as Error).message,
-          });
-        }
-      });
-  };
-
-  const subscribeToEvent = (
-    channelName: string,
-    eventName: string,
-    callback: (message: AblyMessage) => void,
-  ) => {
-    if (!ably) return () => {};
-
-    const channel = ably.channels.get(channelName);
-    const handler = (message: Ably.Types.Message) => {
-      const raw = message.data;
-      const name = message.name ?? eventName;
-
-      if (isEncryptedEnvelope(raw)) {
-        decryptRealTimeData(raw.p)
-          .then((plaintext) => callback({ name, data: plaintext }))
-          .catch((err: Error) => {
-            logger.warn("[ably] subscribe decrypt failed", {
+      publishQueueRef.current = publishQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          try {
+            const ciphertext = await encryptRealTimeData(data);
+            const envelope: EncryptedEnvelope = {
+              __enc: ENVELOPE_VERSION,
+              p: ciphertext,
+            };
+            instance.channels.get(channelName).publish(eventName, envelope);
+          } catch (err) {
+            logger.warn("[ably] publish encryption failed", {
               channel: channelName,
               event: eventName,
-              error: err.message,
+              error: (err as Error).message,
             });
-          });
-        return;
-      }
-
-      callback({
-        name,
-        data: (raw as Record<string, unknown>) ?? {},
-      });
-    };
-
-    channel.subscribe(eventName, handler);
-    return () => channel.unsubscribe(eventName, handler);
-  };
-
-  return (
-    <AblyContext.Provider
-      value={{
-        connected,
-        connectionMode,
-        publishEvent,
-        subscribeToEvent,
-      }}
-    >
-      {children}
-    </AblyContext.Provider>
+          }
+        });
+    },
+    [],
   );
+
+  const subscribeToEvent = useCallback(
+    (
+      channelName: string,
+      eventName: string,
+      callback: (message: AblyMessage) => void,
+    ) => {
+      const instance = ablyRef.current;
+      if (!instance) return () => {};
+
+      const channel = instance.channels.get(channelName);
+      const handler = (message: Ably.Types.Message) => {
+        const raw = message.data;
+        const name = message.name ?? eventName;
+
+        if (isEncryptedEnvelope(raw)) {
+          decryptRealTimeData(raw.p)
+            .then((plaintext) => callback({ name, data: plaintext }))
+            .catch((err: Error) => {
+              logger.warn("[ably] subscribe decrypt failed", {
+                channel: channelName,
+                event: eventName,
+                error: err.message,
+              });
+            });
+          return;
+        }
+
+        callback({
+          name,
+          data: (raw as Record<string, unknown>) ?? {},
+        });
+      };
+
+      channel.subscribe(eventName, handler);
+      return () => channel.unsubscribe(eventName, handler);
+    },
+    // Re-create when ably instance changes so subscribers can reattach
+    // once the realtime client connects (initial render has ably=null).
+    [ably],
+  );
+
+  const value = useMemo<AblyContextType>(
+    () => ({
+      connected,
+      connectionMode,
+      publishEvent,
+      subscribeToEvent,
+    }),
+    [connected, connectionMode, publishEvent, subscribeToEvent],
+  );
+
+  return <AblyContext.Provider value={value}>{children}</AblyContext.Provider>;
 }
 
 export function useAbly() {
