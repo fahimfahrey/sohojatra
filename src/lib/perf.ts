@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { captureError } from "@/lib/observability/sentry";
+// import { captureError } from "@/lib/observability/sentry";
 
 const API_WARN_MS = 200;
 const QUERY_WARN_MS = 100;
@@ -24,12 +24,12 @@ export function withTiming<Args extends unknown[]>(
     } catch (err) {
       const elapsed = performance.now() - start;
       logApi(name, 500, elapsed, err);
-      captureError(err, {
-        action: name,
-        route: name,
-        severity: "critical",
-        reason: "unhandled_route_error",
-      });
+      // captureError(err, {
+      //   action: name,
+      //   route: name,
+      //   severity: "critical",
+      //   reason: "unhandled_route_error",
+      // });
       throw err;
     }
   };

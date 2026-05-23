@@ -1,4 +1,4 @@
-import { Redis } from "@upstash/redis";
+// import { Redis } from "@upstash/redis";
 import type { ActionResult } from "@/lib/validation/schemas";
 
 const KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
@@ -18,15 +18,15 @@ interface MemoryEntry {
 
 const memoryStore = new Map<string, MemoryEntry>();
 
-let redis: Redis | null = null;
-function getRedis(): Redis | null {
-  if (redis) return redis;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  redis = new Redis({ url, token });
-  return redis;
-}
+// let redis: Redis | null = null;
+// function getRedis(): Redis | null {
+//   if (redis) return redis;
+//   const url = process.env.UPSTASH_REDIS_REST_URL;
+//   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+//   if (!url || !token) return null;
+//   redis = new Redis({ url, token });
+//   return redis;
+// }
 
 export function isValidIdempotencyKey(key: unknown): key is string {
   return typeof key === "string" && KEY_PATTERN.test(key);
@@ -67,30 +67,30 @@ export async function tryAcquireIdempotency<T>(
   key: string,
 ): Promise<AcquireOutcome<T>> {
   const k = storageKey(scope, userId, key);
-  const client = getRedis();
+  // const client = getRedis();
 
-  if (client) {
-    try {
-      const acquired = await client.set(k, PENDING_SENTINEL, {
-        nx: true,
-        ex: PENDING_TTL_SECONDS,
-      });
-      if (acquired === "OK") return { state: "acquired" };
-      const existing = await client.get<string>(k);
-      if (existing === null) {
-        const retry = await client.set(k, PENDING_SENTINEL, {
-          nx: true,
-          ex: PENDING_TTL_SECONDS,
-        });
-        if (retry === "OK") return { state: "acquired" };
-        return { state: "pending" };
-      }
-      if (existing === PENDING_SENTINEL) return { state: "pending" };
-      return { state: "hit", result: parseResult<T>(existing) };
-    } catch {
-      // fall through to memory
-    }
-  }
+  // if (client) {
+  //   try {
+  //     const acquired = await client.set(k, PENDING_SENTINEL, {
+  //       nx: true,
+  //       ex: PENDING_TTL_SECONDS,
+  //     });
+  //     if (acquired === "OK") return { state: "acquired" };
+  //     const existing = await client.get<string>(k);
+  //     if (existing === null) {
+  //       const retry = await client.set(k, PENDING_SENTINEL, {
+  //         nx: true,
+  //         ex: PENDING_TTL_SECONDS,
+  //       });
+  //       if (retry === "OK") return { state: "acquired" };
+  //       return { state: "pending" };
+  //     }
+  //     if (existing === PENDING_SENTINEL) return { state: "pending" };
+  //     return { state: "hit", result: parseResult<T>(existing) };
+  //   } catch {
+  //     // fall through to memory
+  //   }
+  // }
 
   if (memorySetNx(k, PENDING_SENTINEL, PENDING_TTL_SECONDS)) {
     return { state: "acquired" };
@@ -110,15 +110,15 @@ export async function storeIdempotencyResult<T>(
 ): Promise<void> {
   const k = storageKey(scope, userId, key);
   const serialized = JSON.stringify(result);
-  const client = getRedis();
-  if (client) {
-    try {
-      await client.set(k, serialized, { ex: RESULT_TTL_SECONDS });
-      return;
-    } catch {
-      // fall through
-    }
-  }
+  // const client = getRedis();
+  // if (client) {
+  //   try {
+  //     await client.set(k, serialized, { ex: RESULT_TTL_SECONDS });
+  //     return;
+  //   } catch {
+  //     // fall through
+  //   }
+  // }
   memorySet(k, serialized, RESULT_TTL_SECONDS);
 }
 
@@ -128,18 +128,18 @@ export async function releaseIdempotencyLock(
   key: string,
 ): Promise<void> {
   const k = storageKey(scope, userId, key);
-  const client = getRedis();
-  if (client) {
-    try {
-      const existing = await client.get<string>(k);
-      if (existing === PENDING_SENTINEL) {
-        await client.del(k);
-      }
-      return;
-    } catch {
-      // fall through
-    }
-  }
+  // const client = getRedis();
+  // if (client) {
+  //   try {
+  //     const existing = await client.get<string>(k);
+  //     if (existing === PENDING_SENTINEL) {
+  //       await client.del(k);
+  //     }
+  //     return;
+  //   } catch {
+  //     // fall through
+  //   }
+  // }
   if (memoryGet(k) === PENDING_SENTINEL) memoryDel(k);
 }
 

@@ -9,7 +9,6 @@ export type AuditAction =
   | "auth.signup"
   | "auth.signout"
   | "auth.callback"
-<<<<<<< HEAD
   | "auth.totp.enroll_start"
   | "auth.totp.enroll_complete"
   | "auth.totp.enroll_abandoned"
@@ -17,11 +16,9 @@ export type AuditAction =
   | "auth.totp.verify"
   | "auth.totp.recovery_use"
   | "auth.totp.stepup"
-=======
   | "auth.reset.request"
   | "auth.reset.confirm"
   | "auth.reset.rate_limited"
->>>>>>> 8a2a26d91f5f1b6da4ad2d3d4a9c45f062001928
   | "ride.create"
   | "ride.join"
   | "ride.cancel"
