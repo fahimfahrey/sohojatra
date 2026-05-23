@@ -1,8 +1,13 @@
 -- ============================================================================
 -- SUPABASE ROW LEVEL SECURITY (RLS) POLICIES
 -- ============================================================================
--- Run in Supabase SQL Editor. Idempotent: safe to re-run.
+-- Run in Supabase SQL Editor (Dashboard → SQL Editor → New query → paste → Run).
+-- Idempotent: safe to re-run.
 -- Tables: users, ride_requests, ride_passengers, notifications
+-- Effect: anon role has no policies → fully denied. Authenticated role gets
+-- least-privilege access per policy. service_role bypasses RLS (server actions
+-- using SERVICE_ROLE_KEY still work). Soft-deleted rows (deleted_at IS NOT NULL)
+-- are hidden from SELECT/UPDATE.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -67,7 +72,7 @@ DROP POLICY IF EXISTS "users_delete_own"  ON public.users;
 CREATE POLICY "users_select_own"
 ON public.users FOR SELECT
 TO authenticated
-USING (auth.uid() = id);
+USING (auth.uid() = id AND deleted_at IS NULL);
 
 CREATE POLICY "users_insert_own"
 ON public.users FOR INSERT
@@ -77,7 +82,7 @@ WITH CHECK (auth.uid() = id);
 CREATE POLICY "users_update_own"
 ON public.users FOR UPDATE
 TO authenticated
-USING      (auth.uid() = id)
+USING      (auth.uid() = id AND deleted_at IS NULL)
 WITH CHECK (auth.uid() = id);
 
 CREATE POLICY "users_delete_own"
@@ -97,9 +102,12 @@ CREATE POLICY "rides_select_visible"
 ON public.ride_requests FOR SELECT
 TO authenticated
 USING (
-  status = 'open'
-  OR creator_id = auth.uid()
-  OR public.is_ride_passenger(id, auth.uid())
+  deleted_at IS NULL
+  AND (
+    status = 'open'
+    OR creator_id = auth.uid()
+    OR public.is_ride_passenger(id, auth.uid())
+  )
 );
 
 CREATE POLICY "rides_insert_own"
@@ -110,7 +118,7 @@ WITH CHECK (creator_id = auth.uid());
 CREATE POLICY "rides_update_own"
 ON public.ride_requests FOR UPDATE
 TO authenticated
-USING      (creator_id = auth.uid() OR public.is_ride_passenger(id, auth.uid()))
+USING      (deleted_at IS NULL AND (creator_id = auth.uid() OR public.is_ride_passenger(id, auth.uid())))
 WITH CHECK (creator_id = auth.uid() OR public.is_ride_passenger(id, auth.uid()));
 -- NOTE: passengers can update because joining decrements seats_available.
 -- Tighten by moving seat-decrement to a SECURITY DEFINER RPC and restricting
@@ -132,8 +140,11 @@ CREATE POLICY "passengers_select_relevant"
 ON public.ride_passengers FOR SELECT
 TO authenticated
 USING (
-  user_id = auth.uid()
-  OR public.is_ride_creator(ride_id, auth.uid())
+  deleted_at IS NULL
+  AND (
+    user_id = auth.uid()
+    OR public.is_ride_creator(ride_id, auth.uid())
+  )
 );
 
 CREATE POLICY "passengers_insert_self"
@@ -160,7 +171,7 @@ DROP POLICY IF EXISTS "notifications_delete_own" ON public.notifications;
 CREATE POLICY "notifications_select_own"
 ON public.notifications FOR SELECT
 TO authenticated
-USING (user_id = auth.uid());
+USING (user_id = auth.uid() AND deleted_at IS NULL);
 
 -- Insert: sender must be the recipient OR a participant of the referenced ride.
 -- Service role bypasses RLS, so server-side fan-out still works.
@@ -181,7 +192,7 @@ WITH CHECK (
 CREATE POLICY "notifications_update_own"
 ON public.notifications FOR UPDATE
 TO authenticated
-USING      (user_id = auth.uid())
+USING      (user_id = auth.uid() AND deleted_at IS NULL)
 WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "notifications_delete_own"
