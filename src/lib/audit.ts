@@ -21,9 +21,17 @@ export type AuditAction =
   | "ride.complete"
   | "phone.access"
   | "user.data.export"
-  | "user.account.delete";
+  | "user.account.delete"
+  | "data.read"
+  | "data.modify"
+  | "data.delete";
 
 export type AuditOutcome = "success" | "failure";
+
+export type AuditChanges = {
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+};
 
 export type AuditEvent = {
   action: AuditAction;
@@ -31,9 +39,33 @@ export type AuditEvent = {
   userId?: string | null;
   resourceId?: string | null;
   detail?: Record<string, unknown>;
+  changes?: AuditChanges;
   ip?: string | null;
   userAgent?: string | null;
 };
+
+/**
+ * Computes a minimal before/after diff for the columns listed in `fields`.
+ * Only fields whose value differs are returned, so the audit row stays small
+ * and forensics can scan `changes` without wading through unchanged columns.
+ */
+export function diffChanges<T extends Record<string, unknown>>(
+  before: T | null | undefined,
+  after: T | null | undefined,
+  fields: ReadonlyArray<keyof T>,
+): AuditChanges {
+  const b: Record<string, unknown> = {};
+  const a: Record<string, unknown> = {};
+  for (const f of fields) {
+    const bv = before ? before[f] : undefined;
+    const av = after ? after[f] : undefined;
+    if (bv !== av) {
+      b[f as string] = bv ?? null;
+      a[f as string] = av ?? null;
+    }
+  }
+  return { before: b, after: a };
+}
 
 const FORWARDED_HEADERS = [
   "x-client-ip",
@@ -76,6 +108,8 @@ export async function logAuditEvent(evt: AuditEvent): Promise<void> {
   const ip = evt.ip ?? ctxIp;
   const userAgent = evt.userAgent ?? ctxUa;
 
+  const changes = evt.changes ?? {};
+
   const consoleRecord = {
     ts: new Date().toISOString(),
     kind: "audit",
@@ -86,6 +120,7 @@ export async function logAuditEvent(evt: AuditEvent): Promise<void> {
     ip,
     user_agent: userAgent,
     detail: evt.detail ?? {},
+    changes,
   };
 
   try {
@@ -98,6 +133,7 @@ export async function logAuditEvent(evt: AuditEvent): Promise<void> {
       p_user_agent: userAgent,
       p_detail: evt.detail ?? {},
       p_user_id: evt.userId ?? null,
+      p_changes: changes,
     });
 
     if (error) {

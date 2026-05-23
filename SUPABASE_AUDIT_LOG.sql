@@ -21,8 +21,13 @@ CREATE TABLE IF NOT EXISTS public.audit_log (
   ip_address    inet,
   user_agent    text,
   detail        jsonb         NOT NULL DEFAULT '{}'::jsonb,
+  changes       jsonb         NOT NULL DEFAULT '{}'::jsonb,
   created_at    timestamptz   NOT NULL DEFAULT now()
 );
+
+-- Backfill for pre-existing deployments that created the table without `changes`.
+ALTER TABLE public.audit_log
+  ADD COLUMN IF NOT EXISTS changes jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS audit_log_user_id_created_at_idx
   ON public.audit_log (user_id, created_at DESC);
@@ -58,7 +63,8 @@ CREATE OR REPLACE FUNCTION public.log_audit_event(
   p_ip_address   text          DEFAULT NULL,
   p_user_agent   text          DEFAULT NULL,
   p_detail       jsonb         DEFAULT '{}'::jsonb,
-  p_user_id      uuid          DEFAULT NULL
+  p_user_id      uuid          DEFAULT NULL,
+  p_changes      jsonb         DEFAULT '{}'::jsonb
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -90,20 +96,74 @@ BEGIN
   END;
 
   INSERT INTO public.audit_log
-    (user_id, action, resource_id, outcome, ip_address, user_agent, detail)
+    (user_id, action, resource_id, outcome, ip_address, user_agent, detail, changes)
   VALUES
     (v_user, p_action, p_resource_id, p_outcome, v_ip,
-     NULLIF(left(p_user_agent, 1024), ''), COALESCE(p_detail, '{}'::jsonb));
+     NULLIF(left(p_user_agent, 1024), ''),
+     COALESCE(p_detail, '{}'::jsonb),
+     COALESCE(p_changes, '{}'::jsonb));
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.log_audit_event(text, text, text, text, text, jsonb, uuid)
+-- Drop the old 7-arg signature so PostgREST resolves the new one unambiguously.
+DROP FUNCTION IF EXISTS public.log_audit_event(text, text, text, text, text, jsonb, uuid);
+
+REVOKE ALL ON FUNCTION public.log_audit_event(text, text, text, text, text, jsonb, uuid, jsonb)
   FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.log_audit_event(text, text, text, text, text, jsonb, uuid)
+GRANT EXECUTE ON FUNCTION public.log_audit_event(text, text, text, text, text, jsonb, uuid, jsonb)
   TO authenticated, anon;
 
 -- ----------------------------------------------------------------------------
--- 4. RETENTION (optional — keep 1 year)
+-- 4. RETENTION — purge entries older than 365 days
 -- ----------------------------------------------------------------------------
--- Schedule via pg_cron in DATA_RETENTION_POLICY routine if used:
---   DELETE FROM public.audit_log WHERE created_at < now() - interval '365 days';
+-- Compliance window is 1 year. The nightly job below deletes anything older
+-- than that. Runs as SECURITY DEFINER so the postgres cron role can execute
+-- it without holding direct DELETE privileges on the table.
+CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
+
+CREATE OR REPLACE FUNCTION public.purge_audit_log()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  DELETE FROM public.audit_log
+   WHERE created_at < now() - interval '365 days';
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.purge_audit_log() FROM PUBLIC, anon, authenticated;
+
+-- Idempotent schedule: unschedule any prior job, then register a fresh one.
+DO $$
+DECLARE
+  v_jobid bigint;
+BEGIN
+  SELECT jobid INTO v_jobid FROM cron.job WHERE jobname = 'audit_log_purge_yearly';
+  IF v_jobid IS NOT NULL THEN
+    PERFORM cron.unschedule(v_jobid);
+  END IF;
+END $$;
+
+-- Run nightly at 03:30 UTC (15m after the retention sweep so they don't overlap).
+SELECT cron.schedule(
+  'audit_log_purge_yearly',
+  '30 3 * * *',
+  $$SELECT public.purge_audit_log();$$
+);
+
+-- ----------------------------------------------------------------------------
+-- 5. VERIFICATION
+-- ----------------------------------------------------------------------------
+-- Confirm cron job is registered
+SELECT jobname, schedule, command FROM cron.job WHERE jobname = 'audit_log_purge_yearly';
+
+-- Dry-run preview (count only)
+SELECT count(*) AS audit_rows_due_for_purge
+FROM   public.audit_log
+WHERE  created_at < now() - interval '365 days';

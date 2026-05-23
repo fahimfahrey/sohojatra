@@ -17,7 +17,7 @@ import {
 } from "@/lib/data/rides";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { checkRateLimit } from "@/lib/rate-limit/server";
-import { logAuditEvent } from "@/lib/audit";
+import { logAuditEvent, diffChanges } from "@/lib/audit";
 import { requireFreshTotp } from "@/lib/auth/require-fresh-totp";
 import { captureError } from "@/lib/observability/sentry";
 import type { RideRequest, VehicleType } from "@/types";
@@ -99,8 +99,23 @@ export async function getRideByIdAction(
     );
 
     if (!ride) {
+      await logAuditEvent({
+        action: "data.read",
+        outcome: "failure",
+        userId: user?.id ?? null,
+        resourceId: parsed.data.rideId,
+        detail: { resource_type: "ride", reason: "not_found_or_forbidden" },
+      });
       return { success: false, error: "Ride not found or access denied" };
     }
+
+    await logAuditEvent({
+      action: "data.read",
+      outcome: "success",
+      userId: user?.id ?? null,
+      resourceId: parsed.data.rideId,
+      detail: { resource_type: "ride" },
+    });
 
     return { success: true, data: ride };
   } catch (err) {
@@ -265,6 +280,15 @@ export async function createRideAction(
         vehicle: parsed.data.vehicle,
         total_seats: parsed.data.totalSeats,
       },
+      changes: {
+        before: null,
+        after: {
+          status: "open",
+          seats_available: parsed.data.totalSeats - 1,
+          total_seats: parsed.data.totalSeats,
+          vehicle: parsed.data.vehicle,
+        },
+      },
     });
 
     revalidatePath("/dashboard");
@@ -358,7 +382,12 @@ export async function joinRideAction(
       outcome: "success",
       userId: user.id,
       resourceId: parsed.data.rideId,
-      detail: { creator_id: ride.creator_id, new_status: newStatus },
+      detail: { creator_id: ride.creator_id },
+      changes: diffChanges(
+        { seats_available: ride.seats_available, status: ride.status },
+        { seats_available: newSeatsAvailable, status: newStatus },
+        ["seats_available", "status"],
+      ),
     });
 
     revalidatePath("/dashboard");
@@ -423,6 +452,11 @@ export async function cancelRideAction(
         userId: user.id,
         resourceId: parsed.data.rideId,
         detail: { role: "creator" },
+        changes: diffChanges(
+          { status: ride.status },
+          { status: "cancelled" },
+          ["status"],
+        ),
       });
     } else {
       if (ride.status === "completed" || ride.status === "cancelled") {
@@ -441,11 +475,15 @@ export async function cancelRideAction(
         .eq("id", parsed.data.rideId)
         .single();
 
+      const beforeSeats = current?.seats_available ?? null;
+      const afterSeats =
+        beforeSeats !== null ? beforeSeats + 1 : null;
+
       if (current) {
         await supabase
           .from("ride_requests")
           .update({
-            seats_available: current.seats_available + 1,
+            seats_available: afterSeats!,
             status: "open",
           })
           .eq("id", parsed.data.rideId);
@@ -456,6 +494,11 @@ export async function cancelRideAction(
         userId: user.id,
         resourceId: parsed.data.rideId,
         detail: { role: "passenger" },
+        changes: diffChanges(
+          { seats_available: beforeSeats, status: ride.status },
+          { seats_available: afterSeats, status: "open" },
+          ["seats_available", "status"],
+        ),
       });
     }
 
@@ -481,6 +524,13 @@ export async function completeRideAction(
     }
 
     const supabase = await createClient();
+    const { data: prior } = await supabase
+      .from("ride_requests")
+      .select("status")
+      .eq("id", parsed.data.rideId)
+      .eq("creator_id", user.id)
+      .maybeSingle();
+
     const { error } = await supabase
       .from("ride_requests")
       .update({ status: "completed" })
@@ -510,6 +560,11 @@ export async function completeRideAction(
       outcome: "success",
       userId: user.id,
       resourceId: parsed.data.rideId,
+      changes: diffChanges(
+        { status: prior?.status ?? null },
+        { status: "completed" },
+        ["status"],
+      ),
     });
 
     revalidatePath("/dashboard");
