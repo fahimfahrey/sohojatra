@@ -1,5 +1,4 @@
 import { supabase } from "./supabase";
-import { rateLimit } from "./rateLimit";
 
 export type SignInCredentials = {
   email: string;
@@ -13,11 +12,6 @@ export type SignUpCredentials = {
 };
 
 export const signIn = async ({ email, password }: SignInCredentials) => {
-  // Rate limit login attempts
-  if (!rateLimit(`login:${email}`, 5, 15 * 60 * 1000)) {
-    throw new Error("Too many login attempts. Please try again later.");
-  }
-
   const result = await supabase.auth.signInWithPassword({
     email,
     password,

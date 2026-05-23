@@ -14,7 +14,14 @@ function secureCookieOptions(options: CookieOptions = {}): CookieOptions {
   };
 }
 
-export async function updateSession(request: NextRequest) {
+export interface UpdateSessionResult {
+  response: NextResponse;
+  userId: string | null;
+}
+
+export async function updateSession(
+  request: NextRequest,
+): Promise<UpdateSessionResult> {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -74,7 +81,7 @@ export async function updateSession(request: NextRequest) {
       url.searchParams.set("reason", "timeout");
       const redirect = NextResponse.redirect(url);
       redirect.cookies.delete(ACTIVITY_COOKIE);
-      return redirect;
+      return { response: redirect, userId: null };
     }
 
     supabaseResponse.cookies.set(
@@ -88,13 +95,13 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    return { response: NextResponse.redirect(url), userId: null };
   }
 
   if (user && isAuthRoute && !pathname.startsWith("/auth/callback")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return { response: NextResponse.redirect(url), userId: user.id };
   }
 
   if (
@@ -106,8 +113,8 @@ export async function updateSession(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/email-confirmation";
-    return NextResponse.redirect(url);
+    return { response: NextResponse.redirect(url), userId: user.id };
   }
 
-  return supabaseResponse;
+  return { response: supabaseResponse, userId: user?.id ?? null };
 }
