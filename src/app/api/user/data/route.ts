@@ -32,7 +32,7 @@ export const GET = withTiming("api.user.data.export", async (req: Request) => {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!checkRateLimit(`export:${user.id}`, 3, 60 * 60 * 1000)) {
+  if (!(await checkRateLimit(`export:${user.id}`, 3, 60 * 60 * 1000))) {
     logDataAccess({
       event: "user.data.export",
       userId: user.id,

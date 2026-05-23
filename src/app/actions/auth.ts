@@ -63,7 +63,7 @@ export async function signInAction(
 
   const ip = await getClientIp();
   const rateKey = `login:${ip}:${parsed.data.email.toLowerCase()}`;
-  if (!checkRateLimit(rateKey, 5, 15 * 60 * 1000)) {
+  if (!(await checkRateLimit(rateKey, 5, 15 * 60 * 1000))) {
     return {
       success: false,
       error: "Too many login attempts. Please try again later.",
@@ -102,7 +102,7 @@ export async function signUpAction(
   }
 
   const ip = await getClientIp();
-  if (!checkRateLimit(`signup:${ip}`, 3, 60 * 60 * 1000)) {
+  if (!(await checkRateLimit(`signup:${ip}`, 3, 60 * 60 * 1000))) {
     return {
       success: false,
       error: "Too many sign-up attempts. Please try again later.",
