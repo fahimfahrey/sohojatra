@@ -7,6 +7,7 @@ import { AppProviders } from "@/components/providers/app-providers";
 import { SerwistProviderWrapper } from "@/components/providers/serwist-provider";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileForUser } from "@/lib/auth/get-profile";
+import { readCsrfCookie } from "@/lib/security/csrf";
 import type { NotificationMessage } from "@/types";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -82,6 +83,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const { user, notifications } = await getInitialSession();
+  const csrfToken = (await readCsrfCookie()) ?? "";
 
   return (
     <html lang="en" className={inter.variable}>
@@ -90,6 +92,7 @@ export default async function RootLayout({
           <AppProviders
             initialUser={user}
             initialNotifications={notifications}
+            csrfToken={csrfToken}
           >
             {children}
           </AppProviders>

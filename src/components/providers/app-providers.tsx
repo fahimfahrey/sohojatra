@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { RideProvider } from "@/contexts/RideContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AblyProvider } from "@/contexts/AblyContext";
+import { CsrfProvider } from "@/contexts/CsrfContext";
 import FloatingCallButton from "@/components/layout/FloatingCallButton";
 import { PWAInstallPrompt } from "@/components/shared/PWAInstallPrompt";
 import type { UserType } from "@/types";
@@ -14,14 +15,17 @@ interface AppProvidersProps {
   children: React.ReactNode;
   initialUser: UserType | null;
   initialNotifications?: NotificationMessage[];
+  csrfToken: string;
 }
 
 export function AppProviders({
   children,
   initialUser,
   initialNotifications = [],
+  csrfToken,
 }: AppProvidersProps) {
   return (
+    <CsrfProvider token={csrfToken}>
     <AuthProvider initialUser={initialUser}>
       <AblyProvider>
         <RideProvider>
@@ -45,5 +49,6 @@ export function AppProviders({
         </RideProvider>
       </AblyProvider>
     </AuthProvider>
+    </CsrfProvider>
   );
 }
