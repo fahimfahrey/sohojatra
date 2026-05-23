@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   TOTP_PASSED_COOKIE,
   verifyTotpPassedCookie,
-} from "@/lib/auth/totp-cookies";
+} from "@/lib/auth/totp-cookies.server";
 
 const SESSION_IDLE_MS = 30 * 60 * 1000;
 const ACTIVITY_COOKIE = "sb-last-activity";

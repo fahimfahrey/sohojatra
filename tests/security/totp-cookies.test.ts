@@ -11,7 +11,7 @@ beforeAll(() => {
   process.env.TOTP_COOKIE_SECRET = "test-totp-cookie-secret-32-bytes-min!";
 });
 
-const cookies = await import("@/lib/auth/totp-cookies");
+const cookies = await import("@/lib/auth/totp-cookies.server");
 
 describe("totp-cookies — passed cookie", () => {
   it("round-trips a valid cookie for the same user", () => {
@@ -38,7 +38,9 @@ describe("totp-cookies — passed cookie", () => {
       .replace(/=+$/, "")
       .replace(/\+/g, "-")
       .replace(/\//g, "_");
-    expect(cookies.verifyTotpPassedCookie(parts.join("."), "user-1")).toBe(false);
+    expect(cookies.verifyTotpPassedCookie(parts.join("."), "user-1")).toBe(
+      false,
+    );
   });
 
   it("rejects missing/empty values", () => {

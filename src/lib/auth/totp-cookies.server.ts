@@ -30,8 +30,9 @@ function b64url(buf: Buffer | string): string {
 }
 
 function b64urlDecode(s: string): Buffer {
-  const padded = s.replace(/-/g, "+").replace(/_/g, "/")
-    + "=".repeat((4 - (s.length % 4)) % 4);
+  const padded =
+    s.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (s.length % 4)) % 4);
   return Buffer.from(padded, "base64");
 }
 

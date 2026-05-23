@@ -28,7 +28,7 @@ import {
   TOTP_STEPUP_COOKIE,
   buildTotpPassedCookie,
   buildTotpStepupCookie,
-} from "@/lib/auth/totp-cookies";
+} from "@/lib/auth/totp-cookies.server";
 
 const CSRF_ERROR: ActionResult<never> = {
   success: false,
@@ -79,10 +79,15 @@ export async function startTotpEnrollmentAction(
   }
 
   if (user.app_metadata?.totp_enabled === true) {
-    return { success: false, error: "Two-factor authentication is already enabled" };
+    return {
+      success: false,
+      error: "Two-factor authentication is already enabled",
+    };
   }
 
-  if (!(await checkRateLimit(`totp:enroll_start:${user.id}`, 5, 60 * 60 * 1000))) {
+  if (
+    !(await checkRateLimit(`totp:enroll_start:${user.id}`, 5, 60 * 60 * 1000))
+  ) {
     await logAuditEvent({
       action: "auth.totp.enroll_start",
       outcome: "failure",
@@ -142,7 +147,13 @@ export async function confirmTotpEnrollmentAction(
     return { success: false, error: "Unauthorized" };
   }
 
-  if (!(await checkRateLimit(`totp:enroll_confirm:${user.id}`, 10, 15 * 60 * 1000))) {
+  if (
+    !(await checkRateLimit(
+      `totp:enroll_confirm:${user.id}`,
+      10,
+      15 * 60 * 1000,
+    ))
+  ) {
     await logAuditEvent({
       action: "auth.totp.enroll_complete",
       outcome: "failure",
@@ -263,7 +274,10 @@ export async function submitTotpChallengeAction(
   }
 
   if (user.app_metadata?.totp_enabled !== true) {
-    return { success: false, error: "Two-factor authentication is not enabled" };
+    return {
+      success: false,
+      error: "Two-factor authentication is not enabled",
+    };
   }
 
   if (!(await checkRateLimit(`totp:challenge:${user.id}`, 5, 15 * 60 * 1000))) {
@@ -292,7 +306,11 @@ export async function submitTotpChallengeAction(
       action: "auth.totp.verify",
       outcome: "failure",
       userId: user.id,
-      detail: { reason: "rpc_error", kind: "challenge", code: error.code ?? null },
+      detail: {
+        reason: "rpc_error",
+        kind: "challenge",
+        code: error.code ?? null,
+      },
     });
     captureError(error, {
       action: "auth.totp.verify",
@@ -336,7 +354,10 @@ export async function submitTotpRecoveryAction(
   }
 
   if (user.app_metadata?.totp_enabled !== true) {
-    return { success: false, error: "Two-factor authentication is not enabled" };
+    return {
+      success: false,
+      error: "Two-factor authentication is not enabled",
+    };
   }
 
   if (!(await checkRateLimit(`totp:recovery:${user.id}`, 5, 60 * 60 * 1000))) {
@@ -408,7 +429,10 @@ export async function submitTotpStepUpAction(
   }
 
   if (user.app_metadata?.totp_enabled !== true) {
-    return { success: false, error: "Two-factor authentication is not enabled" };
+    return {
+      success: false,
+      error: "Two-factor authentication is not enabled",
+    };
   }
 
   if (!(await checkRateLimit(`totp:stepup:${user.id}`, 10, 15 * 60 * 1000))) {
@@ -480,7 +504,10 @@ export async function disableTotpAction(
   }
 
   if (user.app_metadata?.totp_enabled !== true) {
-    return { success: false, error: "Two-factor authentication is not enabled" };
+    return {
+      success: false,
+      error: "Two-factor authentication is not enabled",
+    };
   }
 
   if (!(await checkRateLimit(`totp:disable:${user.id}`, 3, 60 * 60 * 1000))) {
@@ -504,7 +531,10 @@ export async function disableTotpAction(
     return { success: false, error: "Invalid verification code" };
   }
   if (!user.email) {
-    return { success: false, error: "Account has no email; cannot verify password" };
+    return {
+      success: false,
+      error: "Account has no email; cannot verify password",
+    };
   }
 
   const supabase = await createClient();

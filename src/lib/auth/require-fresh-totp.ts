@@ -4,7 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import {
   TOTP_STEPUP_COOKIE,
   verifyTotpStepupCookie,
-} from "@/lib/auth/totp-cookies";
+} from "@/lib/auth/totp-cookies.server";
 
 export type FreshTotpResult =
   | { ok: true }

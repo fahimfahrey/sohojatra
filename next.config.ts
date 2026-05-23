@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import { withSerwist } from "@serwist/turbopack";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
@@ -10,6 +8,16 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "www.gstatic.com", pathname: "/**" },
     ],
+  },
+  webpack: (config, { isServer }) => {
+    // Prevent node:crypto from being bundled in client code
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "node:crypto": false,
+      };
+    }
+    return config;
   },
   async headers() {
     const IMMUTABLE = "public, max-age=31536000, immutable";
@@ -58,8 +66,6 @@ export default withSentryConfig(withSerwist(nextConfig), {
   silent: !process.env.CI,
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring/sentry",
-  disableLogger: true,
-  automaticVercelMonitors: false,
   sourcemaps: { disable: sentryDisabled },
   telemetry: false,
 });

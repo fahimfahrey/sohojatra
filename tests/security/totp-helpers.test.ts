@@ -12,7 +12,7 @@ beforeAll(() => {
 });
 
 const totp = await import("@/lib/totp");
-const cookies = await import("@/lib/auth/totp-cookies");
+const cookies = await import("@/lib/auth/totp-cookies.server");
 
 describe("generateTotpSecret", () => {
   it("returns a 40-char hex and a 32-char base32 (20 bytes)", () => {
@@ -77,16 +77,17 @@ vi.mock("next/headers", () => ({
 }));
 
 describe("requireFreshTotp", () => {
-  const baseUser = (extra: Partial<User> = {}): User => ({
-    id: "user-1",
-    aud: "authenticated",
-    role: "authenticated",
-    email: "ivan@example.com",
-    app_metadata: { totp_enabled: true },
-    user_metadata: {},
-    created_at: "2026-01-01T00:00:00Z",
-    ...extra,
-  }) as User;
+  const baseUser = (extra: Partial<User> = {}): User =>
+    ({
+      id: "user-1",
+      aud: "authenticated",
+      role: "authenticated",
+      email: "ivan@example.com",
+      app_metadata: { totp_enabled: true },
+      user_metadata: {},
+      created_at: "2026-01-01T00:00:00Z",
+      ...extra,
+    }) as User;
 
   async function setCookie(value: string | undefined) {
     const headers = await import("next/headers");

@@ -10,7 +10,7 @@ import { captureError } from "@/lib/observability/sentry";
 import {
   TOTP_PASSED_COOKIE,
   TOTP_STEPUP_COOKIE,
-} from "@/lib/auth/totp-cookies";
+} from "@/lib/auth/totp-cookies.server";
 import {
   signInSchema,
   signUpSchema,
@@ -42,11 +42,7 @@ async function sha256Hex(input: string): Promise<string> {
     .join("");
 }
 
-async function ensureUserProfile(
-  userId: string,
-  email: string,
-  name: string,
-) {
+async function ensureUserProfile(userId: string, email: string, name: string) {
   const supabase = await createClient();
   const { data: existingUser } = await supabase
     .from("users")
@@ -163,8 +159,7 @@ export async function signUpAction(
     };
   }
 
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -263,8 +258,7 @@ export async function requestPasswordResetAction(
     return { success: true };
   }
 
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const redirectTo = `${siteUrl}/auth/callback?next=/reset-password`;
 
   const supabase = await createClient();
@@ -275,9 +269,7 @@ export async function requestPasswordResetAction(
   await logAuditEvent({
     action: "auth.reset.request",
     outcome: error ? "failure" : "success",
-    detail: error
-      ? { reason: "supabase_error", emailHash }
-      : { emailHash },
+    detail: error ? { reason: "supabase_error", emailHash } : { emailHash },
   });
 
   return { success: true };
@@ -362,8 +354,7 @@ export async function confirmPasswordResetAction(
 }
 
 export async function signInWithGoogleAction(): Promise<void> {
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const redirectTo = `${siteUrl}/auth/callback?next=/dashboard`;
 
   const supabase = await createClient();
