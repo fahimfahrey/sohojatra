@@ -19,6 +19,7 @@ import {
   geolocationFailureMessage,
   requestCurrentPosition,
 } from "@/lib/geolocation";
+import { locationConsent } from "@/lib/consent";
 import MapTileLayers from "./MapTileLayers";
 
 // Fix the icon issue with Leaflet in React
@@ -429,6 +430,7 @@ const GlobalMap: React.FC<GlobalMapProps> = ({
     if (typeof navigator === "undefined" || !navigator.permissions?.query) {
       return;
     }
+    if (!locationConsent.granted()) return;
 
     navigator.permissions
       .query({ name: "geolocation" })
@@ -576,7 +578,8 @@ const GlobalMap: React.FC<GlobalMapProps> = ({
           err.reason === "denied" ||
           err.reason === "unavailable" ||
           err.reason === "timeout" ||
-          err.reason === "unsupported"
+          err.reason === "unsupported" ||
+          err.reason === "consent_required"
             ? err.reason
             : "unavailable";
         toast.error(geolocationFailureMessage(reason));

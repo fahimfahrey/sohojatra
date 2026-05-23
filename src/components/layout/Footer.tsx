@@ -1,14 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import TermsModal from "@/components/modals/TermsModal";
-import PrivacyModal from "@/components/modals/PrivacyModal";
+import { cookieConsent } from "@/lib/consent";
 
 export default function Footer() {
-  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
-  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [showCookieReset, setShowCookieReset] = useState(false);
+
+  useEffect(() => {
+    setShowCookieReset(cookieConsent.get() !== null);
+  }, []);
+
+  const resetCookieConsent = () => {
+    cookieConsent.clear();
+    setShowCookieReset(false);
+  };
 
   return (
     <footer className="bg-gradient-to-r from-accent-600 to-secondary-600 text-white">
@@ -66,23 +73,32 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => setIsTermsModalOpen(true)}
+                <Link
+                  href="/terms"
                   className="text-white/80 hover:text-white text-left"
                 >
                   Terms of Service
-                </button>
+                </Link>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => setIsPrivacyModalOpen(true)}
+                <Link
+                  href="/privacy"
                   className="text-white/80 hover:text-white text-left"
                 >
                   Privacy Policy
-                </button>
+                </Link>
               </li>
+              {showCookieReset && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={resetCookieConsent}
+                    className="text-white/80 hover:text-white text-left"
+                  >
+                    Cookie preferences
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
         </div>
@@ -91,15 +107,6 @@ export default function Footer() {
           &copy; {new Date().getFullYear()} Sohojatra. All rights reserved.
         </div>
       </div>
-
-      <TermsModal
-        isOpen={isTermsModalOpen}
-        onClose={() => setIsTermsModalOpen(false)}
-      />
-      <PrivacyModal
-        isOpen={isPrivacyModalOpen}
-        onClose={() => setIsPrivacyModalOpen(false)}
-      />
     </footer>
   );
 }

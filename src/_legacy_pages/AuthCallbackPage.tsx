@@ -22,8 +22,8 @@ const AuthCallbackPage: React.FC = () => {
         }
 
         if (data.session) {
-          console.log('User authenticated successfully:', data.session.user.email);
-          
+          console.log('User authenticated successfully');
+
           // Handle user creation in database
           await handleOAuthUserCreation(data.session.user);
           

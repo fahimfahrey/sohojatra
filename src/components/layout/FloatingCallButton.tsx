@@ -7,6 +7,7 @@ import { useRide } from "../../contexts/RideContext";
 import { useAbly } from "../../contexts/AblyContext";
 import { toast } from "react-hot-toast";
 import { getCreatorPhoneAction } from "@/app/actions/rides";
+import { logger } from "@/lib/observability/logger";
 
 // Set to true to show the button for debugging
 const DEBUG_MODE = false; // Temporarily set to true for debugging
@@ -34,7 +35,7 @@ const FloatingCallButton: React.FC<FloatingCallButtonProps> = ({ rideId }) => {
   // Add debug info
   const addDebugInfo = (info: string) => {
     if (DEBUG_MODE) {
-      console.log("[FloatingCall]", info);
+      logger.debug("[FloatingCall]", info);
       setDebugInfo((prev) => [...prev, info]);
     }
   };

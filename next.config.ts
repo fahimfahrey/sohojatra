@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    const IMMUTABLE = "public, max-age=31536000, immutable";
     return [
       {
         source: "/(.*)",
@@ -19,6 +20,10 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains; preload",
+          },
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(self)",
@@ -28,7 +33,16 @@ const nextConfig: NextConfig = {
             value:
               "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https: https://*.sentry.io https://*.ingest.sentry.io; worker-src 'self' blob:",
           },
+          { key: "Cache-Control", value: "no-cache" },
         ],
+      },
+      {
+        source: "/_next/static/:path*",
+        headers: [{ key: "Cache-Control", value: IMMUTABLE }],
+      },
+      {
+        source: "/_next/image(.*)",
+        headers: [{ key: "Cache-Control", value: IMMUTABLE }],
       },
     ];
   },

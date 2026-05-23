@@ -17,6 +17,16 @@ const MAX_BODY_BYTES = 1_048_576; // 1 MB
 const BODY_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const CSRF_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
+function enforceHttps(request: NextRequest): NextResponse | null {
+  if (process.env.NODE_ENV !== "production") return null;
+  const proto = request.headers.get("x-forwarded-proto");
+  if (!proto || proto === "https") return null;
+
+  const url = request.nextUrl.clone();
+  url.protocol = "https:";
+  return NextResponse.redirect(url, 308);
+}
+
 function generateCsrfToken(): string {
   const bytes = new Uint8Array(CSRF_TOKEN_BYTES);
   crypto.getRandomValues(bytes);
@@ -185,6 +195,9 @@ function isApiKeyAuth(request: NextRequest): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  const httpsRedirect = enforceHttps(request);
+  if (httpsRedirect) return applySecurityHeaders(httpsRedirect);
+
   attachClientContext(request);
 
   const corsResponse = handleCors(request);

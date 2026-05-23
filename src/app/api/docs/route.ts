@@ -8,6 +8,13 @@ const SWAGGER_CSS = `https://cdn.jsdelivr.net/npm/swagger-ui-dist@${SWAGGER_VERS
 const SWAGGER_BUNDLE = `https://cdn.jsdelivr.net/npm/swagger-ui-dist@${SWAGGER_VERSION}/swagger-ui-bundle.js`;
 const SWAGGER_PRESET = `https://cdn.jsdelivr.net/npm/swagger-ui-dist@${SWAGGER_VERSION}/swagger-ui-standalone-preset.js`;
 
+const SWAGGER_CSS_SRI =
+  "sha384-wxLW6kwyHktdDGr6Pv1zgm/VGJh99lfUbzSn6HNHBENZlCN7W602k9VkGdxuFvPn";
+const SWAGGER_BUNDLE_SRI =
+  "sha384-wmyclcVGX/WhUkdkATwhaK1X1JtiNrr2EoYJ+diV3vj4v6OC5yCeSu+yW13SYJep";
+const SWAGGER_PRESET_SRI =
+  "sha384-2YH8WDRaj7V2OqU/trsmzSagmk/E2SutiCsGkdgoQwC9pNUJV1u/141DHB6jgs8t";
+
 const HTML = `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -15,7 +22,7 @@ const HTML = `<!DOCTYPE html>
     <meta name="robots" content="noindex,nofollow" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Sohojatra API — Reference</title>
-    <link rel="stylesheet" href="${SWAGGER_CSS}" />
+    <link rel="stylesheet" href="${SWAGGER_CSS}" integrity="${SWAGGER_CSS_SRI}" crossorigin="anonymous" />
     <style>
       html, body { margin: 0; padding: 0; background: #fafafa; }
       .topbar { display: none; }
@@ -25,8 +32,8 @@ const HTML = `<!DOCTYPE html>
   </head>
   <body>
     <div id="swagger-ui"></div>
-    <script src="${SWAGGER_BUNDLE}" crossorigin="anonymous"></script>
-    <script src="${SWAGGER_PRESET}" crossorigin="anonymous"></script>
+    <script src="${SWAGGER_BUNDLE}" integrity="${SWAGGER_BUNDLE_SRI}" crossorigin="anonymous"></script>
+    <script src="${SWAGGER_PRESET}" integrity="${SWAGGER_PRESET_SRI}" crossorigin="anonymous"></script>
     <script>
       window.addEventListener('load', function () {
         window.ui = SwaggerUIBundle({

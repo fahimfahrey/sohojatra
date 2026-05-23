@@ -9,6 +9,8 @@ import { CsrfProvider } from "@/contexts/CsrfContext";
 import FloatingCallButton from "@/components/layout/FloatingCallButton";
 import { PWAInstallPrompt } from "@/components/shared/PWAInstallPrompt";
 import { StaleDataBanner } from "@/components/shared/StaleDataBanner";
+import { CookieConsent } from "@/components/shared/CookieConsent";
+import { LocationConsentPrompt } from "@/components/shared/LocationConsentPrompt";
 import type { UserType } from "@/types";
 import type { NotificationMessage } from "@/types";
 
@@ -47,6 +49,8 @@ export function AppProviders({
             {children}
             <FloatingCallButton />
             <PWAInstallPrompt />
+            <CookieConsent />
+            <LocationConsentPrompt />
           </NotificationProvider>
         </RideProvider>
       </AblyProvider>

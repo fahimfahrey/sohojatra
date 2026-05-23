@@ -8,6 +8,10 @@ export const RETENTION_DAYS = {
   COMPLETED_RIDE: 90,
   CANCELLED_RIDE: 30,
   DELETED_USER: 30,
+  // Application/diagnostic logs. Short window minimises exposure if a
+  // platform log sink is breached. Compliance-mandated audit_log keeps its
+  // own 365-day window in SUPABASE_AUDIT_LOG.sql.
+  APPLICATION_LOG: 30,
 } as const;
 
 export type AccountDeletionStatus = {

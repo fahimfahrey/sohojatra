@@ -11,10 +11,32 @@ import React, {
 import * as Ably from "ably";
 import { useAuth } from "./AuthContext";
 import { CircuitBreaker } from "@/lib/circuit-breaker";
+import {
+  encryptRealTimeData,
+  decryptRealTimeData,
+} from "@/lib/encryption";
+import { logger } from "@/lib/observability/logger";
 
 interface AblyMessage {
   name: string;
   data: Record<string, unknown>;
+}
+
+const ENVELOPE_VERSION = 1;
+
+interface EncryptedEnvelope {
+  __enc: number;
+  p: string;
+}
+
+function isEncryptedEnvelope(value: unknown): value is EncryptedEnvelope {
+  if (!value || typeof value !== "object") return false;
+  const env = value as Record<string, unknown>;
+  return (
+    env.__enc === ENVELOPE_VERSION &&
+    typeof env.p === "string" &&
+    env.p.length > 0
+  );
 }
 
 export type ConnectionMode = "realtime" | "polling" | "offline";
@@ -123,6 +145,8 @@ export function AblyProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id]);
 
+  const publishQueueRef = useRef<Promise<void>>(Promise.resolve());
+
   const publishEvent = (
     channelName: string,
     eventName: string,
@@ -130,11 +154,24 @@ export function AblyProvider({ children }: { children: ReactNode }) {
   ) => {
     if (!ably || ably.connection.state !== "connected") return;
 
-    try {
-      ably.channels.get(channelName).publish(eventName, data);
-    } catch {
-      // Ignore publish failures (stale connection, capability, etc.)
-    }
+    publishQueueRef.current = publishQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          const ciphertext = await encryptRealTimeData(data);
+          const envelope: EncryptedEnvelope = {
+            __enc: ENVELOPE_VERSION,
+            p: ciphertext,
+          };
+          ably.channels.get(channelName).publish(eventName, envelope);
+        } catch (err) {
+          logger.warn("[ably] publish encryption failed", {
+            channel: channelName,
+            event: eventName,
+            error: (err as Error).message,
+          });
+        }
+      });
   };
 
   const subscribeToEvent = (
@@ -146,9 +183,25 @@ export function AblyProvider({ children }: { children: ReactNode }) {
 
     const channel = ably.channels.get(channelName);
     const handler = (message: Ably.Types.Message) => {
+      const raw = message.data;
+      const name = message.name ?? eventName;
+
+      if (isEncryptedEnvelope(raw)) {
+        decryptRealTimeData(raw.p)
+          .then((plaintext) => callback({ name, data: plaintext }))
+          .catch((err: Error) => {
+            logger.warn("[ably] subscribe decrypt failed", {
+              channel: channelName,
+              event: eventName,
+              error: err.message,
+            });
+          });
+        return;
+      }
+
       callback({
-        name: message.name ?? eventName,
-        data: (message.data as Record<string, unknown>) ?? {},
+        name,
+        data: (raw as Record<string, unknown>) ?? {},
       });
     };
 

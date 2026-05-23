@@ -49,7 +49,7 @@ src/components/auth/LoginForm.tsx   # add "Forgot password?" link
 
 **Server action surface:**
 
-- `requestPasswordResetAction(_prev, formData)` → `ActionResult`. Parses `emailSchema`. Rate-limited `reset:req:ip:<ip>` (3/hour) and `reset:req:email:<sha256(lower(email))>` (3/day). Calls `supabase.auth.resetPasswordForEmail`. **Always returns `{ success: true }`** regardless of whether the email is registered — prevents account enumeration. Audits `auth.reset.request` with outcome `success` or `failure` (rate-limited / invalid input) but never reveals existence to the caller.
+- `requestPasswordResetAction(_prev, formData)` → `ActionResult`. Parses `emailSchema`. Rate-limited `reset:req:ip:<ip>` (3/hour) and `reset:req:email:<sha256(lower(email))>` (3/hour). Calls `supabase.auth.resetPasswordForEmail`. **Always returns `{ success: true }`** regardless of whether the email is registered — prevents account enumeration. Audits `auth.reset.request` with outcome `success` or `failure` (rate-limited / invalid input) but never reveals existence to the caller.
 - `confirmPasswordResetAction(_prev, formData)` → `ActionResult`. Requires an active session (the recovery session created by callback). Parses `passwordSchema`. Rate-limited `reset:confirm:user:<uid>` (5/15min). Calls `supabase.auth.updateUser({ password })`. On success: `supabase.auth.signOut({ scope: 'others' })`, audit `auth.reset.confirm` success, redirect `/login?reset=ok`. On failure: audit, return generic error.
 
 **Callback extension** — `src/app/auth/callback/route.ts` already calls `exchangeCodeForSession` and redirects to `safeNext`. The recovery link Supabase emails sets `?next=/reset-password`; existing `safeNext` check already accepts that path. No code change needed in the callback itself — just confirm `/reset-password` is reachable and is a no-auth-required page that reads the session.
@@ -63,7 +63,7 @@ User visits /forgot-password, enters email
      → CSRF check
      → emailSchema.parse
      → checkRateLimit reset:req:ip:<ip>     (3 / hour)
-     → checkRateLimit reset:req:email:<h>   (3 / day)
+     → checkRateLimit reset:req:email:<h>   (3 / hour)
      → supabase.auth.resetPasswordForEmail(
          email,
          { redirectTo: `${SITE_URL}/auth/callback?next=/reset-password` }

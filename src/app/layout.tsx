@@ -1,10 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { AppProviders } from "@/components/providers/app-providers";
 import { SerwistProviderWrapper } from "@/components/providers/serwist-provider";
+import { ConsentGatedAnalytics } from "@/components/shared/ConsentGatedAnalytics";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileForUser } from "@/lib/auth/get-profile";
 import { readCsrfCookie } from "@/lib/security/csrf";
@@ -97,8 +96,7 @@ export default async function RootLayout({
             {children}
           </AppProviders>
         </SerwistProviderWrapper>
-        <Analytics />
-        <SpeedInsights />
+        <ConsentGatedAnalytics />
       </body>
     </html>
   );

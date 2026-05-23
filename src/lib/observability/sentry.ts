@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import type { PostgrestError } from "@supabase/supabase-js";
+import { redact } from "./redact";
 
 export type ErrorSeverity = "critical" | "error" | "warning";
 
@@ -30,15 +31,24 @@ function isPostgrestError(err: unknown): err is PostgrestError {
 }
 
 function normalize(err: unknown): Error {
-  if (err instanceof Error) return err;
+  if (err instanceof Error) {
+    const safeMsg = redact(err.message);
+    if (typeof safeMsg === "string" && safeMsg !== err.message) {
+      const wrapped = new Error(safeMsg);
+      wrapped.name = err.name;
+      wrapped.stack = err.stack;
+      return wrapped;
+    }
+    return err;
+  }
   if (isPostgrestError(err)) {
-    const wrapped = new Error(`PostgrestError: ${err.message}`);
+    const wrapped = new Error(`PostgrestError: ${redact(err.message)}`);
     wrapped.name = `PostgrestError(${err.code ?? "unknown"})`;
     return wrapped;
   }
-  if (typeof err === "string") return new Error(err);
+  if (typeof err === "string") return new Error(String(redact(err)));
   try {
-    return new Error(JSON.stringify(err));
+    return new Error(JSON.stringify(redact(err)));
   } catch {
     return new Error("Non-serializable error");
   }
@@ -56,14 +66,22 @@ export function captureError(err: unknown, ctx: ErrorContext): void {
     if (ctx.reason) scope.setTag("reason", ctx.reason);
     if (isPostgrestError(err)) {
       scope.setTag("error.kind", "postgrest");
-      scope.setContext("postgrest", {
-        code: err.code,
-        details: err.details,
-        hint: err.hint,
-        message: err.message,
-      });
+      scope.setContext(
+        "postgrest",
+        redact({
+          code: err.code,
+          details: err.details,
+          hint: err.hint,
+          message: err.message,
+        }) as Record<string, unknown>,
+      );
     }
-    if (ctx.extra) scope.setContext("extra", ctx.extra);
+    if (ctx.extra) {
+      scope.setContext(
+        "extra",
+        redact(ctx.extra) as Record<string, unknown>,
+      );
+    }
     Sentry.captureException(normalize(err));
   });
 }
@@ -78,7 +96,12 @@ export function captureMessage(message: string, ctx: ErrorContext): void {
     if (ctx.rideId) scope.setTag("ride_id", ctx.rideId);
     if (ctx.route) scope.setTag("route", ctx.route);
     if (ctx.reason) scope.setTag("reason", ctx.reason);
-    if (ctx.extra) scope.setContext("extra", ctx.extra);
-    Sentry.captureMessage(message);
+    if (ctx.extra) {
+      scope.setContext(
+        "extra",
+        redact(ctx.extra) as Record<string, unknown>,
+      );
+    }
+    Sentry.captureMessage(String(redact(message)));
   });
 }

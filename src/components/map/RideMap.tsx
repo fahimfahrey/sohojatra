@@ -11,6 +11,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Location, RideRequest } from "../../types";
 import { requestCurrentPosition } from "@/lib/geolocation";
+import { locationConsent } from "@/lib/consent";
 // icons not used directly here
 import MapTileLayers from "./MapTileLayers";
 
@@ -191,6 +192,7 @@ const RideMap: React.FC<RideMapProps> = ({
     if (typeof navigator === "undefined" || !navigator.permissions?.query) {
       return;
     }
+    if (!locationConsent.granted()) return;
 
     navigator.permissions
       .query({ name: "geolocation" })

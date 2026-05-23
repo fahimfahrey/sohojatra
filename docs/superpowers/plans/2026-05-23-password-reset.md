@@ -254,7 +254,7 @@ export async function requestPasswordResetAction(
   const emailOk = await checkRateLimit(
     `reset:req:email:${emailHash}`,
     3,
-    24 * 60 * 60 * 1000,
+    60 * 60 * 1000,
   );
 
   if (!ipOk || !emailOk) {

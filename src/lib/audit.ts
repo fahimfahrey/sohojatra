@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { redact } from "@/lib/observability/redact";
 
 export type AuditAction =
   | "auth.signin"
@@ -137,14 +138,20 @@ export async function logAuditEvent(evt: AuditEvent): Promise<void> {
     });
 
     if (error) {
-      console.warn(JSON.stringify({ ...consoleRecord, audit_rpc_error: error.message }));
+      console.warn(
+        JSON.stringify(
+          redact({ ...consoleRecord, audit_rpc_error: error.message }),
+        ),
+      );
     }
   } catch (err) {
     console.warn(
-      JSON.stringify({
-        ...consoleRecord,
-        audit_rpc_error: err instanceof Error ? err.message : "unknown",
-      }),
+      JSON.stringify(
+        redact({
+          ...consoleRecord,
+          audit_rpc_error: err instanceof Error ? err.message : "unknown",
+        }),
+      ),
     );
   }
 }
