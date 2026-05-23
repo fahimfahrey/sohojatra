@@ -1,0 +1,50 @@
+name: Cross-region database backup
+
+on:
+  schedule:
+    # 02:00 UTC daily — runs after Supabase's own managed daily backup completes.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-cross-region
+  cancel-in-progress: false
+
+jobs:
+  dump-and-upload:
+    name: pg_dump -> S3 (secondary region)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Postgres 16 client + AWS CLI
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16 awscli
+
+      - name: Run cross-region backup
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          BACKUP_KMS_KEY_ID: ${{ secrets.BACKUP_KMS_KEY_ID }}
+          BACKUP_AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
+          BACKUP_AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
+        run: ./scripts/backup-cross-region.sh
+
+      - name: Notify Sentry on failure
+        if: failure()
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          if [ -n "${SENTRY_DSN:-}" ]; then
+            curl -sS -X POST "$SENTRY_DSN" \
+              -H "Content-Type: application/json" \
+              -d "{\"message\":\"Cross-region DB backup failed\",\"level\":\"error\",\"tags\":{\"job\":\"backup\"}}" || true
+          fi
