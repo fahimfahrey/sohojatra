@@ -124,3 +124,93 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: reports/dependency-check-report.sarif
+
+  secret-scan:
+    name: Secret scan (secretlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci --ignore-scripts
+
+      - name: Run secretlint
+        run: npm run secrets:scan
+
+  trivy-fs:
+    name: Trivy filesystem + IaC scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy vulnerability + misconfig scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-results.sarif
+          scanners: vuln,secret,misconfig
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs
+
+  trivy-container:
+    name: Trivy container image scan
+    runs-on: ubuntu-latest
+    if: hashFiles('Dockerfile', '**/Dockerfile') != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t sohojatra:ci-scan .
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: sohojatra:ci-scan
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-image.sarif
+
+      - name: Upload Trivy image SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+  security-gate:
+    name: Security gate
+    runs-on: ubuntu-latest
+    needs:
+      - security-tests
+      - npm-audit
+      - codeql
+      - owasp-dependency-check
+      - secret-scan
+      - trivy-fs
+    if: always()
+    steps:
+      - name: Fail if any required scan failed
+        run: |
+          results='${{ toJson(needs) }}'
+          echo "$results"
+          echo "$results" | jq -e 'to_entries | all(.value.result == "success")' \
+            || { echo "One or more security scans failed"; exit 1; }

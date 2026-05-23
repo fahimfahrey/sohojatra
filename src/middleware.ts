@@ -3,8 +3,15 @@ import { updateSession } from "@/lib/supabase/middleware";
 import { CSRF_COOKIE, CSRF_TOKEN_BYTES } from "@/lib/security/csrf";
 import {
   applyApiRateLimit,
+  consumeRateLimit,
+  API_WINDOW_MS,
   type RateLimitResult,
 } from "@/lib/rate-limit/server";
+import { verifyApiKey } from "@/lib/security/api-key";
+import {
+  lookupApiKeyByHash,
+  touchApiKey,
+} from "@/lib/security/api-key-lookup";
 
 const MAX_BODY_BYTES = 1_048_576; // 1 MB
 const BODY_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -168,6 +175,15 @@ function applyRateLimitHeaders(
   return response;
 }
 
+function isApiKeyAuth(request: NextRequest): boolean {
+  const auth = request.headers.get("authorization");
+  if (!auth) return false;
+  const stripped = auth.toLowerCase().startsWith("bearer ")
+    ? auth.slice(7).trim()
+    : auth.trim();
+  return stripped.startsWith("ck_live_");
+}
+
 export async function middleware(request: NextRequest) {
   attachClientContext(request);
 
@@ -181,9 +197,61 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(rejection);
   }
 
+  const isApi = request.nextUrl.pathname.startsWith("/api/");
+
+  // API-key auth path: bypass session / CSRF (Bearer keys are not cookie-bound,
+  // so CSRF doesn't apply), but enforce per-key rate limit and forward context.
+  if (isApi && isApiKeyAuth(request)) {
+    const verified = await verifyApiKey(
+      request.headers.get("authorization"),
+      lookupApiKeyByHash,
+    );
+    if (!verified.ok) {
+      const status = verified.reason === "expired" || verified.reason === "revoked" ? 403 : 401;
+      const reply = NextResponse.json(
+        { error: `API key ${verified.reason}` },
+        { status },
+      );
+      const origin = request.headers.get("origin");
+      if (origin && origin === ALLOWED_ORIGIN) applyCorsHeaders(reply, origin);
+      return applySecurityHeaders(reply);
+    }
+
+    const rl = await consumeRateLimit(
+      `api:key:${verified.record.id}`,
+      verified.record.rate_limit,
+      API_WINDOW_MS,
+    );
+    if (!rl.allowed) {
+      const limited = NextResponse.json(
+        { error: "Rate limit exceeded", retryAfter: rl.retryAfter },
+        { status: 429 },
+      );
+      applyRateLimitHeaders(limited, rl);
+      const origin = request.headers.get("origin");
+      if (origin && origin === ALLOWED_ORIGIN) applyCorsHeaders(limited, origin);
+      return applySecurityHeaders(limited);
+    }
+
+    request.headers.set("x-api-key-id", verified.record.id);
+    request.headers.set("x-api-key-user-id", verified.record.user_id);
+    request.headers.set(
+      "x-api-key-permissions",
+      verified.record.permissions.join(","),
+    );
+
+    // Fire-and-forget last_used_at touch.
+    void touchApiKey(verified.record.id);
+
+    const apiResponse = NextResponse.next({ request });
+    applyRateLimitHeaders(apiResponse, rl);
+    const origin = request.headers.get("origin");
+    if (origin && origin === ALLOWED_ORIGIN) applyCorsHeaders(apiResponse, origin);
+    return applySecurityHeaders(apiResponse);
+  }
+
   const { response, userId } = await updateSession(request);
 
-  const isApi = request.nextUrl.pathname.startsWith("/api/");
   if (isApi) {
     const rl = await applyApiRateLimit({ headers: request.headers, userId });
     if (!rl.allowed) {

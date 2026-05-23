@@ -162,6 +162,12 @@ export const recoveryCodeSchema = z
 
 export type TotpStepUpErrorCode = "2FA_STEPUP_REQUIRED";
 
+export type IdempotencyErrorCode =
+  | "IDEMPOTENCY_IN_PROGRESS"
+  | "IDEMPOTENCY_INVALID_KEY";
+
+export type ActionErrorCode = TotpStepUpErrorCode | IdempotencyErrorCode;
+
 export type ActionResult<T = void> =
   | { success: true; data?: T }
-  | { success: false; error: string; code?: TotpStepUpErrorCode };
+  | { success: false; error: string; code?: ActionErrorCode };

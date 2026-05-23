@@ -128,6 +128,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
         vehicle,
       },
       csrfToken,
+      crypto.randomUUID(),
     );
 
     if (!result.success || !result.data) {
@@ -157,7 +158,11 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   };
 
   const joinRideRequest = async (rideId: string, contactPhone: string) => {
-    const result = await joinRideAction({ rideId, contactPhone }, csrfToken);
+    const result = await joinRideAction(
+      { rideId, contactPhone },
+      csrfToken,
+      crypto.randomUUID(),
+    );
     if (!result.success) throw new Error(result.error);
     await refreshUserRides();
     publishEvent(RIDES_CHANNEL, "sync", { rideId, action: "join" });

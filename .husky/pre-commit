@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+
+# Lint + secrets scan on staged files
+npx lint-staged || exit 1
+
+# Repo-wide TypeScript check
+npm run typecheck || exit 1
+
+# Block commit on high/critical vulns
+npm audit --audit-level=high || {
+  echo "npm audit failed: high or critical vulnerability detected. Run 'npm audit' for details."
+  exit 1
+}

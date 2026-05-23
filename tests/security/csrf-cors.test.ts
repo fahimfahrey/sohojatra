@@ -12,7 +12,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
 vi.mock("@/lib/supabase/middleware", () => ({
-  updateSession: vi.fn(async (req: NextRequest) => NextResponse.next({ request: req })),
+  updateSession: vi.fn(async (req: NextRequest) => ({
+    response: NextResponse.next({ request: req }),
+    userId: null,
+  })),
 }));
 
 const { middleware } = await import("@/middleware");

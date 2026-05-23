@@ -20,6 +20,12 @@ import { checkRateLimit } from "@/lib/rate-limit/server";
 import { logAuditEvent, diffChanges } from "@/lib/audit";
 import { requireFreshTotp } from "@/lib/auth/require-fresh-totp";
 import { captureError } from "@/lib/observability/sentry";
+import {
+  isValidIdempotencyKey,
+  releaseIdempotencyLock,
+  storeIdempotencyResult,
+  tryAcquireIdempotency,
+} from "@/lib/idempotency/server";
 import type { RideRequest, VehicleType } from "@/types";
 
 const CSRF_ERROR: ActionResult<never> = {
@@ -32,6 +38,30 @@ const STEPUP_ERROR: ActionResult<never> = {
   error: "2FA verification required",
   code: "2FA_STEPUP_REQUIRED",
 };
+
+const IDEMPOTENCY_INVALID_KEY_ERROR: ActionResult<never> = {
+  success: false,
+  error: "Invalid idempotency key",
+  code: "IDEMPOTENCY_INVALID_KEY",
+};
+
+const IDEMPOTENCY_IN_PROGRESS_ERROR: ActionResult<never> = {
+  success: false,
+  error: "Request already in progress, retry shortly",
+  code: "IDEMPOTENCY_IN_PROGRESS",
+};
+
+function mapJoinError(message: string): string {
+  if (message.includes("ride not found")) return "Ride not found";
+  if (message.includes("no longer available"))
+    return "This ride is no longer available";
+  if (message.includes("cannot join own ride"))
+    return "You cannot join your own ride";
+  if (message.includes("no seats available")) return "No seats available";
+  if (message.includes("already a passenger"))
+    return "You have already joined this ride";
+  return "Failed to join ride";
+}
 
 export async function getUserRidesAction(): Promise<ActionResult<RideRequest[]>> {
   try {
@@ -196,86 +226,84 @@ export async function getCreatorPhoneAction(
 export async function createRideAction(
   input: unknown,
   csrfToken: string,
+  idempotencyKey: string,
 ): Promise<ActionResult<{ rideId: string }>> {
+  let acquiredUserId: string | null = null;
   try {
     if (!(await validateCsrfToken(csrfToken))) return CSRF_ERROR;
+    if (!isValidIdempotencyKey(idempotencyKey)) return IDEMPOTENCY_INVALID_KEY_ERROR;
     const user = await requireUser();
+
+    const acquire = await tryAcquireIdempotency<{ rideId: string }>(
+      "ride.create",
+      user.id,
+      idempotencyKey,
+    );
+    if (acquire.state === "hit") return acquire.result;
+    if (acquire.state === "pending") return IDEMPOTENCY_IN_PROGRESS_ERROR;
+    acquiredUserId = user.id;
+
     if (!user.email_confirmed_at) {
-      return {
+      const result: ActionResult<{ rideId: string }> = {
         success: false,
         error: "Please verify your email before creating a ride",
       };
+      await storeIdempotencyResult("ride.create", user.id, idempotencyKey, result);
+      return result;
     }
     const stepup = await requireFreshTotp(user);
-    if (!stepup.ok) return STEPUP_ERROR;
+    if (!stepup.ok) {
+      await storeIdempotencyResult("ride.create", user.id, idempotencyKey, STEPUP_ERROR);
+      return STEPUP_ERROR;
+    }
     const parsed = createRideSchema.safeParse(input);
     if (!parsed.success) {
-      return { success: false, error: "Invalid ride data" };
+      const result: ActionResult<{ rideId: string }> = {
+        success: false,
+        error: "Invalid ride data",
+      };
+      await storeIdempotencyResult("ride.create", user.id, idempotencyKey, result);
+      return result;
     }
 
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("ride_requests")
-      .insert({
-        creator_id: user.id,
-        starting_point: parsed.data.startingPoint,
-        destination: parsed.data.destination,
-        seats_available: parsed.data.totalSeats - 1,
-        total_seats: parsed.data.totalSeats,
-        vehicle: parsed.data.vehicle,
-        status: "open",
-        contact_phone: parsed.data.contactPhone,
-      })
-      .select("id")
-      .single();
+    const { data: rideId, error } = await supabase.rpc(
+      "create_ride_with_passenger",
+      {
+        p_starting_point: parsed.data.startingPoint,
+        p_destination: parsed.data.destination,
+        p_total_seats: parsed.data.totalSeats,
+        p_vehicle: parsed.data.vehicle,
+        p_contact_phone: parsed.data.contactPhone,
+      },
+    );
 
-    if (error || !data) {
+    if (error || !rideId) {
       await logAuditEvent({
         action: "ride.create",
         outcome: "failure",
         userId: user.id,
-        detail: { reason: "db_error" },
+        detail: { reason: "rpc_error", code: error?.code ?? null },
       });
-      captureError(error ?? new Error("ride insert returned no row"), {
+      captureError(error ?? new Error("create_ride_with_passenger returned no id"), {
         action: "ride.create",
         userId: user.id,
         severity: "critical",
-        reason: "db_error",
+        reason: "rpc_error",
       });
-      return { success: false, error: "Failed to create ride" };
-    }
-
-    const { error: passengerError } = await supabase
-      .from("ride_passengers")
-      .insert({
-        ride_id: data.id,
-        user_id: user.id,
-        contact_phone: parsed.data.contactPhone,
-      });
-
-    if (passengerError) {
-      await logAuditEvent({
-        action: "ride.create",
-        outcome: "failure",
-        userId: user.id,
-        resourceId: data.id,
-        detail: { reason: "passenger_insert_failed" },
-      });
-      captureError(passengerError, {
-        action: "ride.create",
-        userId: user.id,
-        rideId: data.id,
-        severity: "critical",
-        reason: "passenger_insert_failed",
-      });
-      return { success: false, error: "Failed to register as passenger" };
+      const result: ActionResult<{ rideId: string }> = {
+        success: false,
+        error: "Failed to create ride",
+      };
+      await storeIdempotencyResult("ride.create", user.id, idempotencyKey, result);
+      return result;
     }
 
     await logAuditEvent({
       action: "ride.create",
       outcome: "success",
       userId: user.id,
-      resourceId: data.id,
+      resourceId: rideId as string,
       detail: {
         vehicle: parsed.data.vehicle,
         total_seats: parsed.data.totalSeats,
@@ -293,9 +321,17 @@ export async function createRideAction(
 
     revalidatePath("/dashboard");
     revalidatePath("/rides");
-    return { success: true, data: { rideId: data.id } };
+    const result: ActionResult<{ rideId: string }> = {
+      success: true,
+      data: { rideId: rideId as string },
+    };
+    await storeIdempotencyResult("ride.create", user.id, idempotencyKey, result);
+    return result;
   } catch (err) {
     captureError(err, { action: "ride.create" });
+    if (acquiredUserId) {
+      await releaseIdempotencyLock("ride.create", acquiredUserId, idempotencyKey);
+    }
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -303,89 +339,91 @@ export async function createRideAction(
 export async function joinRideAction(
   input: unknown,
   csrfToken: string,
+  idempotencyKey: string,
 ): Promise<ActionResult> {
+  let acquiredUserId: string | null = null;
   try {
     if (!(await validateCsrfToken(csrfToken))) return CSRF_ERROR;
+    if (!isValidIdempotencyKey(idempotencyKey)) return IDEMPOTENCY_INVALID_KEY_ERROR;
     const user = await requireUser();
+
+    const acquire = await tryAcquireIdempotency<void>(
+      "ride.join",
+      user.id,
+      idempotencyKey,
+    );
+    if (acquire.state === "hit") return acquire.result;
+    if (acquire.state === "pending") return IDEMPOTENCY_IN_PROGRESS_ERROR;
+    acquiredUserId = user.id;
+
     if (!(await checkRateLimit(`join:${user.id}`, 10, 60 * 1000))) {
-      return { success: false, error: "Too many join attempts. Please slow down." };
+      const result: ActionResult = {
+        success: false,
+        error: "Too many join attempts. Please slow down.",
+      };
+      await storeIdempotencyResult("ride.join", user.id, idempotencyKey, result);
+      return result;
     }
     const stepup = await requireFreshTotp(user);
-    if (!stepup.ok) return STEPUP_ERROR;
+    if (!stepup.ok) {
+      await storeIdempotencyResult("ride.join", user.id, idempotencyKey, STEPUP_ERROR);
+      return STEPUP_ERROR;
+    }
     const parsed = joinRideSchema.safeParse(input);
     if (!parsed.success) {
-      return { success: false, error: "Invalid join request" };
+      const result: ActionResult = { success: false, error: "Invalid join request" };
+      await storeIdempotencyResult("ride.join", user.id, idempotencyKey, result);
+      return result;
     }
 
     const supabase = await createClient();
-    const { data: ride, error: rideError } = await supabase
+    const { data: priorRide } = await supabase
       .from("ride_requests")
-      .select("id, creator_id, seats_available, status")
+      .select("creator_id, seats_available, status")
       .eq("id", parsed.data.rideId)
-      .single();
+      .maybeSingle();
 
-    if (rideError || !ride) {
-      return { success: false, error: "Ride not found" };
-    }
+    const { error: rpcError } = await supabase.rpc("join_ride_atomic", {
+      p_ride_id: parsed.data.rideId,
+      p_contact_phone: parsed.data.contactPhone,
+    });
 
-    if (ride.status !== "open") {
-      return { success: false, error: "This ride is no longer available" };
-    }
-
-    if (ride.creator_id === user.id) {
-      return { success: false, error: "You cannot join your own ride" };
-    }
-
-    if (ride.seats_available <= 0) {
-      return { success: false, error: "No seats available" };
-    }
-
-    const { error: passengerError } = await supabase
-      .from("ride_passengers")
-      .insert({
-        ride_id: parsed.data.rideId,
-        user_id: user.id,
-        contact_phone: parsed.data.contactPhone,
-      });
-
-    if (passengerError) {
+    if (rpcError) {
+      const message = mapJoinError(rpcError.message);
       await logAuditEvent({
         action: "ride.join",
         outcome: "failure",
         userId: user.id,
         resourceId: parsed.data.rideId,
-        detail: { reason: "passenger_insert_failed" },
+        detail: { reason: "rpc_error", code: rpcError.code ?? null },
       });
-      captureError(passengerError, {
+      captureError(rpcError, {
         action: "ride.join",
         userId: user.id,
         rideId: parsed.data.rideId,
         severity: "critical",
-        reason: "passenger_insert_failed",
+        reason: "rpc_error",
       });
-      return { success: false, error: "Failed to join ride" };
+      const result: ActionResult = { success: false, error: message };
+      await storeIdempotencyResult("ride.join", user.id, idempotencyKey, result);
+      return result;
     }
 
-    const newSeatsAvailable = ride.seats_available - 1;
-    const newStatus = newSeatsAvailable <= 0 ? "full" : "open";
-
-    await supabase
-      .from("ride_requests")
-      .update({
-        seats_available: newSeatsAvailable,
-        status: newStatus,
-      })
-      .eq("id", parsed.data.rideId);
+    const beforeSeats = priorRide?.seats_available ?? null;
+    const beforeStatus = priorRide?.status ?? null;
+    const afterSeats = beforeSeats !== null ? beforeSeats - 1 : null;
+    const afterStatus =
+      afterSeats !== null && afterSeats <= 0 ? "full" : "open";
 
     await logAuditEvent({
       action: "ride.join",
       outcome: "success",
       userId: user.id,
       resourceId: parsed.data.rideId,
-      detail: { creator_id: ride.creator_id },
+      detail: { creator_id: priorRide?.creator_id ?? null },
       changes: diffChanges(
-        { seats_available: ride.seats_available, status: ride.status },
-        { seats_available: newSeatsAvailable, status: newStatus },
+        { seats_available: beforeSeats, status: beforeStatus },
+        { seats_available: afterSeats, status: afterStatus },
         ["seats_available", "status"],
       ),
     });
@@ -393,9 +431,14 @@ export async function joinRideAction(
     revalidatePath("/dashboard");
     revalidatePath(`/rides/${parsed.data.rideId}`);
     revalidatePath("/rides");
-    return { success: true };
+    const result: ActionResult = { success: true };
+    await storeIdempotencyResult("ride.join", user.id, idempotencyKey, result);
+    return result;
   } catch (err) {
     captureError(err, { action: "ride.join" });
+    if (acquiredUserId) {
+      await releaseIdempotencyLock("ride.join", acquiredUserId, idempotencyKey);
+    }
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -463,31 +506,37 @@ export async function cancelRideAction(
         return { success: false, error: "Cannot leave this ride" };
       }
 
-      await supabase
-        .from("ride_passengers")
-        .delete()
-        .eq("ride_id", parsed.data.rideId)
-        .eq("user_id", user.id);
-
-      const { data: current } = await supabase
+      const { data: priorSeats } = await supabase
         .from("ride_requests")
         .select("seats_available")
         .eq("id", parsed.data.rideId)
-        .single();
+        .maybeSingle();
 
-      const beforeSeats = current?.seats_available ?? null;
-      const afterSeats =
-        beforeSeats !== null ? beforeSeats + 1 : null;
+      const { error: leaveError } = await supabase.rpc("leave_ride_atomic", {
+        p_ride_id: parsed.data.rideId,
+      });
 
-      if (current) {
-        await supabase
-          .from("ride_requests")
-          .update({
-            seats_available: afterSeats!,
-            status: "open",
-          })
-          .eq("id", parsed.data.rideId);
+      if (leaveError) {
+        await logAuditEvent({
+          action: "ride.cancel",
+          outcome: "failure",
+          userId: user.id,
+          resourceId: parsed.data.rideId,
+          detail: { role: "passenger", reason: "rpc_error", code: leaveError.code ?? null },
+        });
+        captureError(leaveError, {
+          action: "ride.cancel",
+          userId: user.id,
+          rideId: parsed.data.rideId,
+          severity: "critical",
+          reason: "rpc_error",
+        });
+        return { success: false, error: "Failed to leave ride" };
       }
+
+      const beforeSeats = priorSeats?.seats_available ?? null;
+      const afterSeats = beforeSeats !== null ? beforeSeats + 1 : null;
+
       await logAuditEvent({
         action: "ride.cancel",
         outcome: "success",
