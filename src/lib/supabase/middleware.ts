@@ -127,10 +127,10 @@ export async function updateSession(
     user.app_metadata?.totp_enabled === true &&
     isProtected &&
     !is2faRoute &&
-    !verifyTotpPassedCookie(
+    !(await verifyTotpPassedCookie(
       request.cookies.get(TOTP_PASSED_COOKIE)?.value,
       user.id,
-    )
+    ))
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/2fa/challenge";

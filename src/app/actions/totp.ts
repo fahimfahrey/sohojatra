@@ -243,7 +243,7 @@ export async function confirmTotpEnrollmentAction(
   }
 
   const store = await cookies();
-  const passed = buildTotpPassedCookie(user.id);
+  const passed = await buildTotpPassedCookie(user.id);
   store.set(passed.name, passed.value, passed.options);
 
   await logAuditEvent({
@@ -326,7 +326,7 @@ export async function submitTotpChallengeAction(
   }
 
   const store = await cookies();
-  const passed = buildTotpPassedCookie(user.id);
+  const passed = await buildTotpPassedCookie(user.id);
   store.set(passed.name, passed.value, passed.options);
 
   await logAuditEvent({
@@ -402,7 +402,7 @@ export async function submitTotpRecoveryAction(
   }
 
   const store = await cookies();
-  const passed = buildTotpPassedCookie(user.id);
+  const passed = await buildTotpPassedCookie(user.id);
   store.set(passed.name, passed.value, passed.options);
 
   await logAuditEvent({
@@ -477,7 +477,7 @@ export async function submitTotpStepUpAction(
   }
 
   const store = await cookies();
-  const stepup = buildTotpStepupCookie(user.id);
+  const stepup = await buildTotpStepupCookie(user.id);
   store.set(stepup.name, stepup.value, stepup.options);
 
   await logAuditEvent({

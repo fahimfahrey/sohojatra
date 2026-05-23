@@ -14,55 +14,54 @@ beforeAll(() => {
 const cookies = await import("@/lib/auth/totp-cookies.server");
 
 describe("totp-cookies — passed cookie", () => {
-  it("round-trips a valid cookie for the same user", () => {
-    const c = cookies.buildTotpPassedCookie("user-123");
-    expect(cookies.verifyTotpPassedCookie(c.value, "user-123")).toBe(true);
+  it("round-trips a valid cookie for the same user", async () => {
+    const c = await cookies.buildTotpPassedCookie("user-123");
+    await expect(cookies.verifyTotpPassedCookie(c.value, "user-123")).resolves.toBe(true);
   });
 
-  it("rejects a cookie minted for a different user (replay across accounts)", () => {
-    const c = cookies.buildTotpPassedCookie("user-A");
-    expect(cookies.verifyTotpPassedCookie(c.value, "user-B")).toBe(false);
+  it("rejects a cookie minted for a different user (replay across accounts)", async () => {
+    const c = await cookies.buildTotpPassedCookie("user-A");
+    await expect(cookies.verifyTotpPassedCookie(c.value, "user-B")).resolves.toBe(false);
   });
 
-  it("rejects a tampered signature", () => {
-    const c = cookies.buildTotpPassedCookie("user-1");
+  it("rejects a tampered signature", async () => {
+    const c = await cookies.buildTotpPassedCookie("user-1");
     const tampered = c.value.slice(0, -3) + "AAA";
-    expect(cookies.verifyTotpPassedCookie(tampered, "user-1")).toBe(false);
+    await expect(cookies.verifyTotpPassedCookie(tampered, "user-1")).resolves.toBe(false);
   });
 
-  it("rejects a tampered expiry segment", () => {
-    const c = cookies.buildTotpPassedCookie("user-1");
+  it("rejects a tampered expiry segment", async () => {
+    const c = await cookies.buildTotpPassedCookie("user-1");
     const parts = c.value.split(".");
-    parts[1] = Buffer.from(String(Date.now() + 86_400_000), "utf8")
-      .toString("base64")
+    parts[1] = btoa(String(Date.now() + 86_400_000))
       .replace(/=+$/, "")
       .replace(/\+/g, "-")
       .replace(/\//g, "_");
-    expect(cookies.verifyTotpPassedCookie(parts.join("."), "user-1")).toBe(
+    await expect(cookies.verifyTotpPassedCookie(parts.join("."), "user-1")).resolves.toBe(
       false,
     );
   });
 
-  it("rejects missing/empty values", () => {
-    expect(cookies.verifyTotpPassedCookie(undefined, "user-1")).toBe(false);
-    expect(cookies.verifyTotpPassedCookie("", "user-1")).toBe(false);
-    expect(cookies.verifyTotpPassedCookie("a.b", "user-1")).toBe(false);
+  it("rejects missing/empty values", async () => {
+    await expect(cookies.verifyTotpPassedCookie(undefined, "user-1")).resolves.toBe(false);
+    await expect(cookies.verifyTotpPassedCookie("", "user-1")).resolves.toBe(false);
+    await expect(cookies.verifyTotpPassedCookie("a.b", "user-1")).resolves.toBe(false);
   });
 });
 
 describe("totp-cookies — stepup cookie", () => {
-  it("round-trips for the same user", () => {
-    const c = cookies.buildTotpStepupCookie("user-1");
-    expect(cookies.verifyTotpStepupCookie(c.value, "user-1")).toBe(true);
+  it("round-trips for the same user", async () => {
+    const c = await cookies.buildTotpStepupCookie("user-1");
+    await expect(cookies.verifyTotpStepupCookie(c.value, "user-1")).resolves.toBe(true);
   });
 
-  it("rejects a passed-cookie value when verifying a stepup cookie has expired", () => {
+  it("rejects a passed-cookie value when verifying a stepup cookie has expired", async () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
-      const c = cookies.buildTotpStepupCookie("user-1");
+      const c = await cookies.buildTotpStepupCookie("user-1");
       vi.setSystemTime(new Date("2026-01-01T00:30:00Z")); // +30 min, past 15-min TTL
-      expect(cookies.verifyTotpStepupCookie(c.value, "user-1")).toBe(false);
+      await expect(cookies.verifyTotpStepupCookie(c.value, "user-1")).resolves.toBe(false);
     } finally {
       vi.useRealTimers();
     }

@@ -20,7 +20,7 @@ export async function requireFreshTotp(user: User): Promise<FreshTotpResult> {
   const store = await cookies();
   const raw = store.get(TOTP_STEPUP_COOKIE)?.value;
   if (!raw) return { ok: false, reason: "stepup_required" };
-  if (!verifyTotpStepupCookie(raw, user.id)) {
+  if (!(await verifyTotpStepupCookie(raw, user.id))) {
     return { ok: false, reason: "stepup_required" };
   }
   return { ok: true };

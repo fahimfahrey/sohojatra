@@ -117,14 +117,14 @@ describe("requireFreshTotp", () => {
 
   it("accepts a valid stepup cookie", async () => {
     const { requireFreshTotp } = await import("@/lib/auth/require-fresh-totp");
-    const c = cookies.buildTotpStepupCookie("user-1");
+    const c = await cookies.buildTotpStepupCookie("user-1");
     await setCookie(c.value);
     expect(await requireFreshTotp(baseUser())).toEqual({ ok: true });
   });
 
   it("rejects a stepup cookie minted for a different user", async () => {
     const { requireFreshTotp } = await import("@/lib/auth/require-fresh-totp");
-    const c = cookies.buildTotpStepupCookie("attacker");
+    const c = await cookies.buildTotpStepupCookie("attacker");
     await setCookie(c.value);
     expect(await requireFreshTotp(baseUser())).toEqual({
       ok: false,
@@ -134,7 +134,7 @@ describe("requireFreshTotp", () => {
 
   it("rejects a tampered stepup cookie", async () => {
     const { requireFreshTotp } = await import("@/lib/auth/require-fresh-totp");
-    const c = cookies.buildTotpStepupCookie("user-1");
+    const c = await cookies.buildTotpStepupCookie("user-1");
     await setCookie(c.value.slice(0, -3) + "AAA");
     expect(await requireFreshTotp(baseUser())).toEqual({
       ok: false,

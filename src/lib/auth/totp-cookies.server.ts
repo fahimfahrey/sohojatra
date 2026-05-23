@@ -1,5 +1,4 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
 
 export const TOTP_PASSED_COOKIE = "sb-2fa-passed";
 export const TOTP_STEPUP_COOKIE = "sb-2fa-stepup";
@@ -7,50 +6,82 @@ export const TOTP_STEPUP_COOKIE = "sb-2fa-stepup";
 export const TOTP_STEPUP_MAX_AGE_SEC = 15 * 60;
 const PASSED_MAX_AGE_SEC = 12 * 60 * 60;
 
-function getSecret(): Buffer {
+function getSecret(): Uint8Array {
   const raw = process.env.TOTP_COOKIE_SECRET;
   if (!raw) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("TOTP_COOKIE_SECRET is required in production");
     }
-    return Buffer.from(
+    return new TextEncoder().encode(
       "dev-only-totp-cookie-secret-not-for-production-use-please-set-env",
     );
   }
-  return Buffer.from(raw, "utf8");
+  return new TextEncoder().encode(raw);
 }
 
-function b64url(buf: Buffer | string): string {
-  const b = typeof buf === "string" ? Buffer.from(buf, "utf8") : buf;
-  return b
-    .toString("base64")
+function b64url(bytes: Uint8Array | string): string {
+  const buf = typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes;
+  let binary = "";
+  for (let i = 0; i < buf.length; i++) {
+    binary += String.fromCharCode(buf[i]);
+  }
+  return btoa(binary)
     .replace(/=+$/, "")
     .replace(/\+/g, "-")
     .replace(/\//g, "_");
 }
 
-function b64urlDecode(s: string): Buffer {
+function b64urlDecode(s: string): Uint8Array {
   const padded =
     s.replace(/-/g, "+").replace(/_/g, "/") +
     "=".repeat((4 - (s.length % 4)) % 4);
-  return Buffer.from(padded, "base64");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
-function sign(payload: string): string {
-  return b64url(createHmac("sha256", getSecret()).update(payload).digest());
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a[i] ^ b[i];
+  }
+  return result === 0;
 }
 
-function buildValue(userId: string, expiresAtMs: number): string {
+async function sign(payload: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    getSecret() as BufferSource,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(payload),
+  );
+  return b64url(new Uint8Array(signature));
+}
+
+async function buildValue(
+  userId: string,
+  expiresAtMs: number,
+): Promise<string> {
   const uidPart = b64url(userId);
   const expPart = b64url(String(expiresAtMs));
-  const sig = sign(`${uidPart}.${expPart}`);
+  const sig = await sign(`${uidPart}.${expPart}`);
   return `${uidPart}.${expPart}.${sig}`;
 }
 
-function verifyValue(
+async function verifyValue(
   raw: string | undefined | null,
   userId: string,
-): { ok: true; expiresAtMs: number } | { ok: false } {
+): Promise<{ ok: true; expiresAtMs: number } | { ok: false }> {
   if (!raw || typeof raw !== "string") return { ok: false };
   const parts = raw.split(".");
   if (parts.length !== 3) return { ok: false };
@@ -59,19 +90,24 @@ function verifyValue(
   let claimedUid: string;
   let claimedExpStr: string;
   try {
-    claimedUid = b64urlDecode(uidPart).toString("utf8");
-    claimedExpStr = b64urlDecode(expPart).toString("utf8");
+    claimedUid = new TextDecoder().decode(b64urlDecode(uidPart));
+    claimedExpStr = new TextDecoder().decode(b64urlDecode(expPart));
   } catch {
     return { ok: false };
   }
 
   if (claimedUid !== userId) return { ok: false };
 
-  const expectedSig = sign(`${uidPart}.${expPart}`);
-  const sigBuf = Buffer.from(sig, "utf8");
-  const expBuf = Buffer.from(expectedSig, "utf8");
-  if (sigBuf.length !== expBuf.length) return { ok: false };
-  if (!timingSafeEqual(sigBuf, expBuf)) return { ok: false };
+  const expectedSig = await sign(`${uidPart}.${expPart}`);
+  let sigBytes: Uint8Array;
+  let expBytes: Uint8Array;
+  try {
+    sigBytes = b64urlDecode(sig);
+    expBytes = b64urlDecode(expectedSig);
+  } catch {
+    return { ok: false };
+  }
+  if (!constantTimeEqual(sigBytes, expBytes)) return { ok: false };
 
   const expiresAtMs = Number(claimedExpStr);
   if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
@@ -80,7 +116,7 @@ function verifyValue(
   return { ok: true, expiresAtMs };
 }
 
-export function buildTotpPassedCookie(userId: string): {
+export async function buildTotpPassedCookie(userId: string): Promise<{
   name: string;
   value: string;
   options: {
@@ -90,11 +126,11 @@ export function buildTotpPassedCookie(userId: string): {
     path: "/";
     maxAge: number;
   };
-} {
+}> {
   const expiresAt = Date.now() + PASSED_MAX_AGE_SEC * 1000;
   return {
     name: TOTP_PASSED_COOKIE,
-    value: buildValue(userId, expiresAt),
+    value: await buildValue(userId, expiresAt),
     options: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -105,7 +141,7 @@ export function buildTotpPassedCookie(userId: string): {
   };
 }
 
-export function buildTotpStepupCookie(userId: string): {
+export async function buildTotpStepupCookie(userId: string): Promise<{
   name: string;
   value: string;
   options: {
@@ -115,11 +151,11 @@ export function buildTotpStepupCookie(userId: string): {
     path: "/";
     maxAge: number;
   };
-} {
+}> {
   const expiresAt = Date.now() + TOTP_STEPUP_MAX_AGE_SEC * 1000;
   return {
     name: TOTP_STEPUP_COOKIE,
-    value: buildValue(userId, expiresAt),
+    value: await buildValue(userId, expiresAt),
     options: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -130,16 +166,18 @@ export function buildTotpStepupCookie(userId: string): {
   };
 }
 
-export function verifyTotpPassedCookie(
+export async function verifyTotpPassedCookie(
   raw: string | undefined | null,
   userId: string,
-): boolean {
-  return verifyValue(raw, userId).ok;
+): Promise<boolean> {
+  const result = await verifyValue(raw, userId);
+  return result.ok;
 }
 
-export function verifyTotpStepupCookie(
+export async function verifyTotpStepupCookie(
   raw: string | undefined | null,
   userId: string,
-): boolean {
-  return verifyValue(raw, userId).ok;
+): Promise<boolean> {
+  const result = await verifyValue(raw, userId);
+  return result.ok;
 }
