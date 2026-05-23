@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit/server";
 import { logAuditEvent } from "@/lib/audit";
+import { captureError } from "@/lib/observability/sentry";
 import {
   TOTP_PASSED_COOKIE,
   TOTP_STEPUP_COOKIE,
@@ -94,6 +95,13 @@ export async function signInAction(
       outcome: "failure",
       detail: { reason: "invalid_credentials", email: parsed.data.email },
     });
+    if (error && error.status && error.status >= 500) {
+      captureError(error, {
+        action: "auth.signin",
+        severity: "critical",
+        reason: "supabase_5xx",
+      });
+    }
     return { success: false, error: "Invalid email or password" };
   }
 
@@ -165,6 +173,11 @@ export async function signUpAction(
       outcome: "failure",
       detail: { reason: "supabase_error", email: parsed.data.email },
     });
+    captureError(error, {
+      action: "auth.signup",
+      severity: "critical",
+      reason: "supabase_error",
+    });
     return {
       success: false,
       error:
@@ -228,6 +241,11 @@ export async function signInWithGoogleAction(): Promise<void> {
       action: "auth.signin.oauth",
       outcome: "failure",
       detail: { provider: "google", reason: "oauth_init_failed" },
+    });
+    captureError(error ?? new Error("OAuth redirect URL missing"), {
+      action: "auth.signin.oauth",
+      severity: "critical",
+      reason: "oauth_init_failed",
     });
     redirect("/login?error=oauth");
   }

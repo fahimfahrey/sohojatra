@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import * as Ably from "ably/promises";
 import { createClient } from "@/lib/supabase/server";
 import { withTiming } from "@/lib/perf";
+import { captureError } from "@/lib/observability/sentry";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,12 @@ export const GET = withTiming("api.ably.token", async () => {
     return NextResponse.json(tokenRequest);
   } catch (err) {
     console.error("[ably/token]", err);
+    captureError(err, {
+      action: "ably.token",
+      route: "/api/ably/token",
+      severity: "critical",
+      reason: "token_issue_failed",
+    });
     return NextResponse.json(
       { error: "Failed to issue realtime token" },
       { status: 500 },

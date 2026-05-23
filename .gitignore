@@ -68,3 +68,7 @@ desktop.ini
 # Misc
 todo
 *.pem
+
+# Sentry
+.sentryclirc
+.sentry-build-plugin

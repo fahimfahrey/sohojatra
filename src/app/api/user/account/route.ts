@@ -4,6 +4,7 @@ import { checkRateLimit } from "@/lib/rate-limit/server";
 import { logDataAccess } from "@/lib/audit";
 import { RETENTION_DAYS } from "@/lib/dataRetention";
 import { withTiming } from "@/lib/perf";
+import { captureError } from "@/lib/observability/sentry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,6 +61,13 @@ export const DELETE = withTiming("api.user.account.delete", async (req: Request)
       userAgent,
       outcome: "failure",
       detail: { reason: "rpc_error", message: rpcError.message },
+    });
+    captureError(rpcError, {
+      action: "user.account.delete",
+      userId: user.id,
+      route: "/api/user/account",
+      severity: "critical",
+      reason: "rpc_error",
     });
     return NextResponse.json(
       { error: "Failed to schedule deletion" },

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/require-user";
+import { captureError } from "@/lib/observability/sentry";
 import { messageSchema, type ActionResult } from "@/lib/validation/schemas";
 import type { NotificationMessage } from "@/types";
 
@@ -25,6 +26,11 @@ export async function getNotificationsAction(): Promise<
       .order("created_at", { ascending: false });
 
     if (error) {
+      captureError(error, {
+        action: "notifications.list",
+        userId: user.id,
+        reason: "db_error",
+      });
       return { success: false, error: "Failed to load notifications" };
     }
 
@@ -39,7 +45,8 @@ export async function getNotificationsAction(): Promise<
     }));
 
     return { success: true, data: notifications };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "notifications.action" });
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -67,7 +74,8 @@ export async function markNotificationReadAction(
 
     revalidatePath("/dashboard");
     return { success: true };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "notifications.action" });
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -89,7 +97,8 @@ export async function markAllNotificationsReadAction(): Promise<ActionResult> {
 
     revalidatePath("/dashboard");
     return { success: true };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "notifications.action" });
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -121,7 +130,8 @@ export async function createNotificationAction(input: {
 
     revalidatePath("/dashboard");
     return { success: true };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "notifications.action" });
     return { success: false, error: "Unauthorized" };
   }
 }

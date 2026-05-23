@@ -27,6 +27,7 @@
     ]
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.53.1",
     "@serwist/turbopack": "9.5.11",
     "@supabase/ssr": "0.10.3",
     "@supabase/supabase-js": "2.105.4",

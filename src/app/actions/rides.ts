@@ -19,6 +19,7 @@ import { validateCsrfToken } from "@/lib/security/csrf";
 import { checkRateLimit } from "@/lib/rate-limit/server";
 import { logAuditEvent } from "@/lib/audit";
 import { requireFreshTotp } from "@/lib/auth/require-fresh-totp";
+import { captureError } from "@/lib/observability/sentry";
 import type { RideRequest, VehicleType } from "@/types";
 
 const CSRF_ERROR: ActionResult<never> = {
@@ -38,7 +39,8 @@ export async function getUserRidesAction(): Promise<ActionResult<RideRequest[]>>
     const supabase = await createClient();
     const rides = await fetchUserRidesServer(supabase, user.id);
     return { success: true, data: rides };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "ride.list" });
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -73,7 +75,8 @@ export async function searchRidesAction(input: {
     );
 
     return { success: true, data: rides };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "ride.search" });
     return { success: false, error: "Failed to search rides" };
   }
 }
@@ -100,7 +103,8 @@ export async function getRideByIdAction(
     }
 
     return { success: true, data: ride };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "ride.get", rideId });
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -139,6 +143,13 @@ export async function getCreatorPhoneAction(
         resourceId: parsed.data.rideId,
         detail: { reason: "rpc_error", code: error.code ?? null },
       });
+      captureError(error, {
+        action: "phone.access",
+        userId: user.id,
+        rideId: parsed.data.rideId,
+        severity: "critical",
+        reason: "rpc_error",
+      });
       return { success: false, error: "Access denied" };
     }
 
@@ -161,7 +172,8 @@ export async function getCreatorPhoneAction(
     });
 
     return { success: true, data: { phone: data as string } };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "phone.access", rideId });
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -209,6 +221,12 @@ export async function createRideAction(
         userId: user.id,
         detail: { reason: "db_error" },
       });
+      captureError(error ?? new Error("ride insert returned no row"), {
+        action: "ride.create",
+        userId: user.id,
+        severity: "critical",
+        reason: "db_error",
+      });
       return { success: false, error: "Failed to create ride" };
     }
 
@@ -228,6 +246,13 @@ export async function createRideAction(
         resourceId: data.id,
         detail: { reason: "passenger_insert_failed" },
       });
+      captureError(passengerError, {
+        action: "ride.create",
+        userId: user.id,
+        rideId: data.id,
+        severity: "critical",
+        reason: "passenger_insert_failed",
+      });
       return { success: false, error: "Failed to register as passenger" };
     }
 
@@ -245,7 +270,8 @@ export async function createRideAction(
     revalidatePath("/dashboard");
     revalidatePath("/rides");
     return { success: true, data: { rideId: data.id } };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "ride.create" });
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -306,6 +332,13 @@ export async function joinRideAction(
         resourceId: parsed.data.rideId,
         detail: { reason: "passenger_insert_failed" },
       });
+      captureError(passengerError, {
+        action: "ride.join",
+        userId: user.id,
+        rideId: parsed.data.rideId,
+        severity: "critical",
+        reason: "passenger_insert_failed",
+      });
       return { success: false, error: "Failed to join ride" };
     }
 
@@ -332,7 +365,8 @@ export async function joinRideAction(
     revalidatePath(`/rides/${parsed.data.rideId}`);
     revalidatePath("/rides");
     return { success: true };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "ride.join" });
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -428,7 +462,8 @@ export async function cancelRideAction(
     revalidatePath("/dashboard");
     revalidatePath(`/rides/${parsed.data.rideId}`);
     return { success: true };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "ride.cancel", rideId });
     return { success: false, error: "Unauthorized" };
   }
 }
@@ -460,6 +495,13 @@ export async function completeRideAction(
         resourceId: parsed.data.rideId,
         detail: { reason: "db_error" },
       });
+      captureError(error, {
+        action: "ride.complete",
+        userId: user.id,
+        rideId: parsed.data.rideId,
+        severity: "critical",
+        reason: "db_error",
+      });
       return { success: false, error: "Failed to complete ride" };
     }
 
@@ -473,7 +515,8 @@ export async function completeRideAction(
     revalidatePath("/dashboard");
     revalidatePath(`/rides/${parsed.data.rideId}`);
     return { success: true };
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "ride.complete", rideId });
     return { success: false, error: "Unauthorized" };
   }
 }

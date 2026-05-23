@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import { validateCsrfToken } from "@/lib/security/csrf";
 import { checkRateLimit } from "@/lib/rate-limit/server";
 import { logAuditEvent } from "@/lib/audit";
+import { captureError } from "@/lib/observability/sentry";
 import {
   totpCodeSchema,
   recoveryCodeSchema,
@@ -106,6 +107,12 @@ export async function startTotpEnrollmentAction(
       userId: user.id,
       detail: { reason: "rpc_error", code: error.code ?? null },
     });
+    captureError(error, {
+      action: "auth.totp.enroll_start",
+      userId: user.id,
+      severity: "critical",
+      reason: "rpc_error",
+    });
     return { success: false, error: "Could not start enrollment. Try again." };
   }
 
@@ -169,6 +176,12 @@ export async function confirmTotpEnrollmentAction(
       userId: user.id,
       detail: { reason: "rpc_error", code: verifyError.code ?? null },
     });
+    captureError(verifyError, {
+      action: "auth.totp.enroll_complete",
+      userId: user.id,
+      severity: "critical",
+      reason: "rpc_error",
+    });
     return { success: false, error: "Verification failed. Please try again." };
   }
 
@@ -190,18 +203,30 @@ export async function confirmTotpEnrollmentAction(
       userId: user.id,
       detail: { reason: "recovery_persist_failed" },
     });
+    captureError(codesError, {
+      action: "auth.totp.enroll_complete",
+      userId: user.id,
+      severity: "critical",
+      reason: "recovery_persist_failed",
+    });
     return { success: false, error: "Could not finish enrollment. Try again." };
   }
 
   try {
     await setTotpAppMetadata(user.id, true);
-  } catch {
+  } catch (metadataErr) {
     await supabase.rpc("disable_totp");
     await logAuditEvent({
       action: "auth.totp.enroll_complete",
       outcome: "failure",
       userId: user.id,
       detail: { reason: "metadata_update_failed" },
+    });
+    captureError(metadataErr, {
+      action: "auth.totp.enroll_complete",
+      userId: user.id,
+      severity: "critical",
+      reason: "metadata_update_failed",
     });
     return { success: false, error: "Could not finish enrollment. Try again." };
   }
@@ -268,6 +293,12 @@ export async function submitTotpChallengeAction(
       outcome: "failure",
       userId: user.id,
       detail: { reason: "rpc_error", kind: "challenge", code: error.code ?? null },
+    });
+    captureError(error, {
+      action: "auth.totp.verify",
+      userId: user.id,
+      severity: "critical",
+      reason: "rpc_error",
     });
     return { success: false, error: "Verification failed. Please try again." };
   }
@@ -336,6 +367,12 @@ export async function submitTotpRecoveryAction(
       userId: user.id,
       detail: { reason: "rpc_error", code: error.code ?? null },
     });
+    captureError(error, {
+      action: "auth.totp.recovery_use",
+      userId: user.id,
+      severity: "critical",
+      reason: "rpc_error",
+    });
     return { success: false, error: "Verification failed. Please try again." };
   }
 
@@ -401,6 +438,12 @@ export async function submitTotpStepUpAction(
       outcome: "failure",
       userId: user.id,
       detail: { reason: "rpc_error", code: error.code ?? null },
+    });
+    captureError(error, {
+      action: "auth.totp.stepup",
+      userId: user.id,
+      severity: "critical",
+      reason: "rpc_error",
     });
     return { success: false, error: "Verification failed. Please try again." };
   }
@@ -490,6 +533,12 @@ export async function disableTotpAction(
       userId: user.id,
       detail: { reason: "rpc_error", code: verifyError.code ?? null },
     });
+    captureError(verifyError, {
+      action: "auth.totp.disable",
+      userId: user.id,
+      severity: "critical",
+      reason: "rpc_error",
+    });
     return { success: false, error: "Verification failed. Please try again." };
   }
   if (!verified) {
@@ -510,17 +559,29 @@ export async function disableTotpAction(
       userId: user.id,
       detail: { reason: "rpc_error", code: disableError.code ?? null },
     });
+    captureError(disableError, {
+      action: "auth.totp.disable",
+      userId: user.id,
+      severity: "critical",
+      reason: "rpc_error",
+    });
     return { success: false, error: "Could not disable. Try again." };
   }
 
   try {
     await setTotpAppMetadata(user.id, false);
-  } catch {
+  } catch (metadataErr) {
     await logAuditEvent({
       action: "auth.totp.disable",
       outcome: "failure",
       userId: user.id,
       detail: { reason: "metadata_update_failed" },
+    });
+    captureError(metadataErr, {
+      action: "auth.totp.disable",
+      userId: user.id,
+      severity: "critical",
+      reason: "metadata_update_failed",
     });
     return { success: false, error: "Could not disable. Try again." };
   }

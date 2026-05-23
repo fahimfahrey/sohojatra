@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit/server";
 import { logDataAccess } from "@/lib/audit";
 import { withTiming, timedQuery } from "@/lib/perf";
+import { captureError } from "@/lib/observability/sentry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,6 +69,13 @@ export const GET = withTiming("api.user.data.export", async (req: Request) => {
       userAgent,
       outcome: "failure",
       detail: { reason: "db_error", message: firstError.message },
+    });
+    captureError(firstError, {
+      action: "user.data.export",
+      userId: user.id,
+      route: "/api/user/data",
+      severity: "critical",
+      reason: "db_error",
     });
     return NextResponse.json(
       { error: "Failed to export data" },
