@@ -1,8 +1,29 @@
 import { z } from "zod";
-import DOMPurify from "isomorphic-dompurify";
+
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  "#39": "'",
+};
 
 const sanitizeText = (val: string) =>
-  DOMPurify.sanitize(val, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).trim();
+  val
+    .replace(/<[^>]*>/g, "")
+    .replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (_, ent: string) => {
+      if (ent.startsWith("#x") || ent.startsWith("#X")) {
+        const cp = parseInt(ent.slice(2), 16);
+        return Number.isFinite(cp) ? String.fromCodePoint(cp) : "";
+      }
+      if (ent.startsWith("#")) {
+        const cp = parseInt(ent.slice(1), 10);
+        return Number.isFinite(cp) ? String.fromCodePoint(cp) : "";
+      }
+      return NAMED_ENTITIES[ent] ?? "";
+    })
+    .trim();
 
 export const emailSchema = z.string().email().max(255);
 export const passwordSchema = z.string().min(8).max(128);

@@ -3,11 +3,10 @@
  *
  * Strategy:
  *   - Zod schemas reject malformed input before queries run.
- *   - String fields routed through DOMPurify (sanitizeText) strip script/HTML.
+ *   - String fields routed through sanitizeText strip script/HTML.
  *   - Supabase queries use parameterized eq()/insert() — no string interpolation in WHERE.
  */
 import { describe, it, expect } from "vitest";
-import DOMPurify from "isomorphic-dompurify";
 import {
   signInSchema,
   signUpSchema,
@@ -48,10 +47,11 @@ describe("A03 Injection — XSS payloads in user-facing string fields", () => {
     });
   }
 
-  it("DOMPurify directly strips all tags for ALLOWED_TAGS=[]", () => {
+  it("messageSchema strips all tags from XSS payloads", () => {
     for (const payload of XSS_PAYLOADS) {
-      const clean = DOMPurify.sanitize(payload, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
-      expect(clean).not.toMatch(/<[a-z]/i);
+      const parsed = messageSchema.safeParse(payload);
+      if (!parsed.success) continue;
+      expect(parsed.data).not.toMatch(/<[a-z]/i);
     }
   });
 
