@@ -135,7 +135,25 @@ function validateApiRequest(request: NextRequest): NextResponse | null {
   return null;
 }
 
+function resolveClientIp(request: NextRequest): string {
+  const fwd = request.headers.get("x-forwarded-for");
+  if (fwd) {
+    const first = fwd.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return request.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
+function attachClientContext(request: NextRequest): void {
+  request.headers.set("x-client-ip", resolveClientIp(request));
+  if (!request.headers.get("user-agent")) {
+    request.headers.set("user-agent", "unknown");
+  }
+}
+
 export async function middleware(request: NextRequest) {
+  attachClientContext(request);
+
   const corsResponse = handleCors(request);
   if (corsResponse) return applySecurityHeaders(corsResponse);
 

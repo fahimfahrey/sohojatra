@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit/server";
+import { logAuditEvent } from "@/lib/audit";
 import {
   signInSchema,
   signUpSchema,
@@ -58,12 +59,22 @@ export async function signInAction(
   });
 
   if (!parsed.success) {
+    await logAuditEvent({
+      action: "auth.signin",
+      outcome: "failure",
+      detail: { reason: "invalid_input" },
+    });
     return { success: false, error: "Invalid email or password" };
   }
 
   const ip = await getClientIp();
   const rateKey = `login:${ip}:${parsed.data.email.toLowerCase()}`;
   if (!(await checkRateLimit(rateKey, 5, 15 * 60 * 1000))) {
+    await logAuditEvent({
+      action: "auth.signin",
+      outcome: "failure",
+      detail: { reason: "rate_limited", email: parsed.data.email },
+    });
     return {
       success: false,
       error: "Too many login attempts. Please try again later.",
@@ -74,8 +85,20 @@ export async function signInAction(
   const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error || !data.user) {
+    await logAuditEvent({
+      action: "auth.signin",
+      outcome: "failure",
+      detail: { reason: "invalid_credentials", email: parsed.data.email },
+    });
     return { success: false, error: "Invalid email or password" };
   }
+
+  await logAuditEvent({
+    action: "auth.signin",
+    outcome: "success",
+    userId: data.user.id,
+    resourceId: data.user.id,
+  });
 
   const userName =
     (data.user.user_metadata?.name as string | undefined) ??
@@ -98,11 +121,21 @@ export async function signUpAction(
   });
 
   if (!parsed.success) {
+    await logAuditEvent({
+      action: "auth.signup",
+      outcome: "failure",
+      detail: { reason: "invalid_input" },
+    });
     return { success: false, error: "Please check your registration details" };
   }
 
   const ip = await getClientIp();
   if (!(await checkRateLimit(`signup:${ip}`, 3, 60 * 60 * 1000))) {
+    await logAuditEvent({
+      action: "auth.signup",
+      outcome: "failure",
+      detail: { reason: "rate_limited", email: parsed.data.email },
+    });
     return {
       success: false,
       error: "Too many sign-up attempts. Please try again later.",
@@ -123,6 +156,11 @@ export async function signUpAction(
   });
 
   if (error) {
+    await logAuditEvent({
+      action: "auth.signup",
+      outcome: "failure",
+      detail: { reason: "supabase_error", email: parsed.data.email },
+    });
     return {
       success: false,
       error:
@@ -134,13 +172,29 @@ export async function signUpAction(
     await ensureUserProfile(data.user.id, parsed.data.email, parsed.data.name);
   }
 
+  await logAuditEvent({
+    action: "auth.signup",
+    outcome: "success",
+    userId: data.user?.id ?? null,
+    resourceId: data.user?.id ?? null,
+  });
+
   revalidatePath("/", "layout");
   redirect("/email-confirmation");
 }
 
 export async function signOutAction(): Promise<void> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   await supabase.auth.signOut();
+  await logAuditEvent({
+    action: "auth.signout",
+    outcome: "success",
+    userId: user?.id ?? null,
+    resourceId: user?.id ?? null,
+  });
   revalidatePath("/", "layout");
   redirect("/");
 }
@@ -163,8 +217,19 @@ export async function signInWithGoogleAction(): Promise<void> {
   });
 
   if (error || !data.url) {
+    await logAuditEvent({
+      action: "auth.signin.oauth",
+      outcome: "failure",
+      detail: { provider: "google", reason: "oauth_init_failed" },
+    });
     redirect("/login?error=oauth");
   }
+
+  await logAuditEvent({
+    action: "auth.signin.oauth",
+    outcome: "success",
+    detail: { provider: "google", stage: "redirect" },
+  });
 
   redirect(data.url);
 }
