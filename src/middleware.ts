@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { CSRF_COOKIE, CSRF_TOKEN_BYTES } from "@/lib/security/csrf";
+import {
+  applyApiRateLimit,
+  type RateLimitResult,
+} from "@/lib/rate-limit/server";
 
 const MAX_BODY_BYTES = 1_048_576; // 1 MB
 const BODY_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -151,6 +155,19 @@ function attachClientContext(request: NextRequest): void {
   }
 }
 
+function applyRateLimitHeaders(
+  response: NextResponse,
+  result: RateLimitResult,
+): NextResponse {
+  response.headers.set("X-RateLimit-Limit", String(result.limit));
+  response.headers.set("X-RateLimit-Remaining", String(result.remaining));
+  response.headers.set("X-RateLimit-Reset", String(result.reset));
+  if (!result.allowed) {
+    response.headers.set("Retry-After", String(result.retryAfter));
+  }
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   attachClientContext(request);
 
@@ -164,10 +181,27 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(rejection);
   }
 
-  const response = await updateSession(request);
+  const { response, userId } = await updateSession(request);
+
+  const isApi = request.nextUrl.pathname.startsWith("/api/");
+  if (isApi) {
+    const rl = await applyApiRateLimit({ headers: request.headers, userId });
+    if (!rl.allowed) {
+      const limited = NextResponse.json(
+        { error: "Rate limit exceeded", retryAfter: rl.retryAfter },
+        { status: 429 },
+      );
+      applyRateLimitHeaders(limited, rl);
+      const origin = request.headers.get("origin");
+      if (origin && origin === ALLOWED_ORIGIN) applyCorsHeaders(limited, origin);
+      return applySecurityHeaders(limited);
+    }
+    applyRateLimitHeaders(response, rl);
+  }
+
   ensureCsrfCookie(request, response);
   const origin = request.headers.get("origin");
-  if (origin && origin === ALLOWED_ORIGIN && request.nextUrl.pathname.startsWith("/api/")) {
+  if (origin && origin === ALLOWED_ORIGIN && isApi) {
     applyCorsHeaders(response, origin);
   }
   return applySecurityHeaders(response);
