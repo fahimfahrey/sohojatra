@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import type { RideRequest, Location, VehicleType } from "@/types";
 import { useAuth } from "./AuthContext";
 import { RIDES_CHANNEL, useAbly } from "./AblyContext";
+import { useCsrfToken } from "./CsrfContext";
 import {
   getUserRidesAction,
   searchRidesAction,
@@ -43,6 +44,7 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { publishEvent, subscribeToEvent } = useAbly();
+  const csrfToken = useCsrfToken();
 
   const refreshUserRides = useCallback(async () => {
     if (!user) {
@@ -78,13 +80,16 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
     contactPhone: string,
     vehicle: VehicleType,
   ): Promise<RideRequest> => {
-    const result = await createRideAction({
-      startingPoint,
-      destination,
-      totalSeats,
-      contactPhone,
-      vehicle,
-    });
+    const result = await createRideAction(
+      {
+        startingPoint,
+        destination,
+        totalSeats,
+        contactPhone,
+        vehicle,
+      },
+      csrfToken,
+    );
 
     if (!result.success || !result.data) {
       throw new Error(
@@ -113,21 +118,21 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   };
 
   const joinRideRequest = async (rideId: string, contactPhone: string) => {
-    const result = await joinRideAction({ rideId, contactPhone });
+    const result = await joinRideAction({ rideId, contactPhone }, csrfToken);
     if (!result.success) throw new Error(result.error);
     await refreshUserRides();
     publishEvent(RIDES_CHANNEL, "sync", { rideId, action: "join" });
   };
 
   const cancelRideRequest = async (rideId: string) => {
-    const result = await cancelRideAction(rideId);
+    const result = await cancelRideAction(rideId, csrfToken);
     if (!result.success) throw new Error(result.error);
     await refreshUserRides();
     publishEvent(RIDES_CHANNEL, "sync", { rideId, action: "cancel" });
   };
 
   const completeRideRequest = async (rideId: string) => {
-    const result = await completeRideAction(rideId);
+    const result = await completeRideAction(rideId, csrfToken);
     if (!result.success) throw new Error(result.error);
     await refreshUserRides();
     publishEvent(RIDES_CHANNEL, "sync", { rideId, action: "complete" });

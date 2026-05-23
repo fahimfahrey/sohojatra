@@ -15,7 +15,13 @@ import {
   searchRidesByRouteServer,
   fetchRideByIdServer,
 } from "@/lib/data/rides";
+import { validateCsrfToken } from "@/lib/security/csrf";
 import type { RideRequest, VehicleType } from "@/types";
+
+const CSRF_ERROR: ActionResult<never> = {
+  success: false,
+  error: "Invalid or missing CSRF token",
+};
 
 export async function getUserRidesAction(): Promise<ActionResult<RideRequest[]>> {
   try {
@@ -123,8 +129,10 @@ export async function getCreatorPhoneAction(
 
 export async function createRideAction(
   input: unknown,
+  csrfToken: string,
 ): Promise<ActionResult<{ rideId: string }>> {
   try {
+    if (!(await validateCsrfToken(csrfToken))) return CSRF_ERROR;
     const user = await requireUser();
     if (!user.email_confirmed_at) {
       return {
@@ -179,8 +187,10 @@ export async function createRideAction(
 
 export async function joinRideAction(
   input: unknown,
+  csrfToken: string,
 ): Promise<ActionResult> {
   try {
+    if (!(await validateCsrfToken(csrfToken))) return CSRF_ERROR;
     const user = await requireUser();
     const parsed = joinRideSchema.safeParse(input);
     if (!parsed.success) {
@@ -242,8 +252,12 @@ export async function joinRideAction(
   }
 }
 
-export async function cancelRideAction(rideId: string): Promise<ActionResult> {
+export async function cancelRideAction(
+  rideId: string,
+  csrfToken: string,
+): Promise<ActionResult> {
   try {
+    if (!(await validateCsrfToken(csrfToken))) return CSRF_ERROR;
     const user = await requireUser();
     const parsed = rideIdSchema.safeParse({ rideId });
     if (!parsed.success) {
@@ -320,8 +334,12 @@ export async function cancelRideAction(rideId: string): Promise<ActionResult> {
   }
 }
 
-export async function completeRideAction(rideId: string): Promise<ActionResult> {
+export async function completeRideAction(
+  rideId: string,
+  csrfToken: string,
+): Promise<ActionResult> {
   try {
+    if (!(await validateCsrfToken(csrfToken))) return CSRF_ERROR;
     const user = await requireUser();
     const parsed = rideIdSchema.safeParse({ rideId });
     if (!parsed.success) {

@@ -1,8 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import { CSRF_COOKIE, CSRF_TOKEN_BYTES } from "@/lib/security/csrf";
 
 const MAX_BODY_BYTES = 1_048_576; // 1 MB
 const BODY_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const CSRF_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+
+function generateCsrfToken(): string {
+  const bytes = new Uint8Array(CSRF_TOKEN_BYTES);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function ensureCsrfCookie(request: NextRequest, response: NextResponse) {
+  if (request.cookies.get(CSRF_COOKIE)) return;
+  const token = generateCsrfToken();
+  response.cookies.set(CSRF_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: CSRF_MAX_AGE,
+  });
+}
 
 const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
@@ -125,6 +147,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = await updateSession(request);
+  ensureCsrfCookie(request, response);
   const origin = request.headers.get("origin");
   if (origin && origin === ALLOWED_ORIGIN && request.nextUrl.pathname.startsWith("/api/")) {
     applyCorsHeaders(response, origin);
