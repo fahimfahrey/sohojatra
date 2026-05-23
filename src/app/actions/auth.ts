@@ -9,6 +9,7 @@ import { logAuditEvent } from "@/lib/audit";
 import {
   signInSchema,
   signUpSchema,
+  emailSchema,
   type ActionResult,
 } from "@/lib/validation/schemas";
 
@@ -26,6 +27,14 @@ async function getClientIp(): Promise<string> {
     headersList.get("x-real-ip") ??
     "unknown"
   );
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const bytes = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 async function ensureUserProfile(
@@ -197,6 +206,139 @@ export async function signOutAction(): Promise<void> {
   });
   revalidatePath("/", "layout");
   redirect("/");
+}
+
+export async function requestPasswordResetAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = emailSchema.safeParse(formData.get("email"));
+
+  if (!parsed.success) {
+    await logAuditEvent({
+      action: "auth.reset.request",
+      outcome: "failure",
+      detail: { reason: "invalid_input" },
+    });
+    return { success: true };
+  }
+
+  const email = parsed.data.toLowerCase();
+  const emailHash = await sha256Hex(email);
+  const ip = await getClientIp();
+
+  const ipOk = await checkRateLimit(`reset:req:ip:${ip}`, 3, 60 * 60 * 1000);
+  const emailOk = await checkRateLimit(
+    `reset:req:email:${emailHash}`,
+    3,
+    24 * 60 * 60 * 1000,
+  );
+
+  if (!ipOk || !emailOk) {
+    await logAuditEvent({
+      action: "auth.reset.rate_limited",
+      outcome: "failure",
+      detail: { reason: "rate_limited", emailHash },
+    });
+    return { success: true };
+  }
+
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const redirectTo = `${siteUrl}/auth/callback?next=/reset-password`;
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+
+  await logAuditEvent({
+    action: "auth.reset.request",
+    outcome: error ? "failure" : "success",
+    detail: error
+      ? { reason: "supabase_error", emailHash }
+      : { emailHash },
+  });
+
+  return { success: true };
+}
+
+const resetPasswordSchema = signUpSchema.shape.password;
+
+export async function confirmPasswordResetAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    await logAuditEvent({
+      action: "auth.reset.confirm",
+      outcome: "failure",
+      detail: { reason: "no_session" },
+    });
+    return {
+      success: false,
+      error: "Reset link expired. Request a new one.",
+    };
+  }
+
+  const parsed = resetPasswordSchema.safeParse(formData.get("password"));
+  if (!parsed.success) {
+    await logAuditEvent({
+      action: "auth.reset.confirm",
+      outcome: "failure",
+      userId: user.id,
+      detail: { reason: "invalid_input" },
+    });
+    return {
+      success: false,
+      error: "Password must be at least 8 characters.",
+    };
+  }
+
+  const limitKey = `reset:confirm:user:${user.id}`;
+  if (!(await checkRateLimit(limitKey, 5, 15 * 60 * 1000))) {
+    await logAuditEvent({
+      action: "auth.reset.confirm",
+      outcome: "failure",
+      userId: user.id,
+      detail: { reason: "rate_limited" },
+    });
+    return {
+      success: false,
+      error: "Too many attempts. Try again later.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data });
+  if (error) {
+    await logAuditEvent({
+      action: "auth.reset.confirm",
+      outcome: "failure",
+      userId: user.id,
+      detail: { reason: "update_failed" },
+    });
+    return {
+      success: false,
+      error: "Could not update password. Please request a new reset link.",
+    };
+  }
+
+  await supabase.auth.signOut({ scope: "others" });
+
+  await logAuditEvent({
+    action: "auth.reset.confirm",
+    outcome: "success",
+    userId: user.id,
+    resourceId: user.id,
+  });
+
+  revalidatePath("/", "layout");
+  redirect("/login?reset=ok");
 }
 
 export async function signInWithGoogleAction(): Promise<void> {
