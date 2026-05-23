@@ -113,7 +113,7 @@ describe("A01 Broken Access Control — /api/ably/token GET", () => {
   it("returns 401 when unauthenticated (no realtime token leak)", async () => {
     mockedCreateClient.mockResolvedValue(buildSupabaseMock({ user: null }) as never);
     const { GET } = await import("@/app/api/ably/token/route");
-    const res = await GET(makeReq());
+    const res = await GET();
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).not.toHaveProperty("keyName");
@@ -125,7 +125,7 @@ describe("A01 Broken Access Control — /api/ably/token GET", () => {
     delete process.env.ABLY_API_KEY;
     mockedCreateClient.mockResolvedValue(buildSupabaseMock({ user: FAKE_USER }) as never);
     const { GET } = await import("@/app/api/ably/token/route");
-    const res = await GET(makeReq());
+    const res = await GET();
     expect(res.status).toBe(503);
     process.env.ABLY_API_KEY = prev;
   });

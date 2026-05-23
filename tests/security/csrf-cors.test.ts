@@ -21,7 +21,7 @@ const ALLOWED = "https://sohojatra.test";
 const EVIL = "https://attacker.example";
 
 function req(url: string, init: RequestInit & { headers?: Record<string, string> } = {}) {
-  return new NextRequest(new URL(url), init as RequestInit);
+  return new NextRequest(new URL(url), init as ConstructorParameters<typeof NextRequest>[1]);
 }
 
 describe("A05 CORS / CSRF — middleware", () => {
