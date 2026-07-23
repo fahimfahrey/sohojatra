@@ -22,8 +22,17 @@ export function AuthProvider({
   initialUser: UserType | null;
 }) {
   const [user, setUserState] = useState<UserType | null>(initialUser);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [isEmailConfirmed, setIsEmailConfirmed] = useState(true);
+
+  // Server actions (login/signup) set the auth cookie server-side and
+  // revalidate the layout, which re-renders with a fresh initialUser prop.
+  // useState ignores prop changes after mount, so sync explicitly — otherwise
+  // the client keeps the stale user until a full reload.
+  useEffect(() => {
+    setUserState(initialUser);
+    setIsEmailConfirmed(true);
+  }, [initialUser]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -72,6 +81,7 @@ export function AuthProvider({
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
