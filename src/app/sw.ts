@@ -1,8 +1,8 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/turbopack/worker";
-import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist } from "serwist";
+import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig } from "serwist";
+import { NetworkOnly, Serwist } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -12,12 +12,32 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+// Map-tile and Leaflet marker-image hosts. These serve *opaque* cross-origin
+// responses, which the browser pads to ~7 MB each in Cache Storage accounting.
+// serwist's defaultCache would otherwise store them (tiles ending in `.png`
+// hit `static-image-assets`, the rest hit the `cross-origin` bucket), so a
+// minute of panning the map balloons reported storage into the hundreds of MB
+// and the per-request expiration bookkeeping janks the UI. Never cache them —
+// always go straight to the network so nothing accumulates on disk.
+const TILE_HOSTS = [
+  "google.com", // mt{0-3}.google.com/vt tiles
+  "tile.openstreetmap.org",
+  "unpkg.com", // leaflet marker icon/shadow PNGs
+];
+
+const noStoreTiles: RuntimeCaching = {
+  matcher: ({ url }) => TILE_HOSTS.some((host) => url.hostname.endsWith(host)),
+  handler: new NetworkOnly(),
+};
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  // noStoreTiles must precede defaultCache — the first matching route wins,
+  // and defaultCache's image/cross-origin rules would otherwise claim tiles.
+  runtimeCaching: [noStoreTiles, ...defaultCache],
   fallbacks: {
     entries: [
       {
@@ -31,6 +51,33 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+// One-time reclaim: users who ran an earlier build already have opaque map
+// tiles bloating the runtime caches (`static-image-assets` keeps them for 30
+// days). Purge any tile-host entries on activation so the space frees itself
+// on the next visit instead of waiting for expiration or a manual clear.
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      for (const cacheName of await caches.keys()) {
+        const cache = await caches.open(cacheName);
+        const requests = await cache.keys();
+        await Promise.all(
+          requests
+            .filter((request) => {
+              try {
+                const { hostname } = new URL(request.url);
+                return TILE_HOSTS.some((host) => hostname.endsWith(host));
+              } catch {
+                return false;
+              }
+            })
+            .map((request) => cache.delete(request)),
+        );
+      }
+    })(),
+  );
+});
 
 self.addEventListener("notificationclick", (event) => {
   const notification = event.notification;

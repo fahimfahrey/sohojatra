@@ -23,7 +23,6 @@ const FindRideForm: React.FC = () => {
   // Function to refresh matching rides - memoized to avoid recreating on every render
   const refreshMatchingRides = useCallback(async () => {
     if (searched && startingPoint && destination) {
-      console.log("Refreshing ride matches...");
 
       // First refresh the user's own rides
       await refreshUserRides();
@@ -34,7 +33,6 @@ const FindRideForm: React.FC = () => {
         destination,
         null,
       );
-      console.log(`Found ${updatedRides.length} total matching rides`);
 
       // Update the all matching rides
       setAllMatchingRides(updatedRides);
@@ -43,9 +41,6 @@ const FindRideForm: React.FC = () => {
       if (selectedVehicle) {
         const vehicleFilteredRides = updatedRides.filter(
           (ride) => ride.vehicle === selectedVehicle,
-        );
-        console.log(
-          `After vehicle filter (${selectedVehicle}): ${vehicleFilteredRides.length} rides`,
         );
         setFilteredRides(vehicleFilteredRides);
       } else {
@@ -68,12 +63,8 @@ const FindRideForm: React.FC = () => {
         const vehicleFilteredRides = allMatchingRides.filter(
           (ride) => ride.vehicle === selectedVehicle,
         );
-        console.log(
-          `Vehicle filter applied (${selectedVehicle}): ${vehicleFilteredRides.length} rides`,
-        );
         setFilteredRides(vehicleFilteredRides);
       } else {
-        console.log("Vehicle filter cleared, showing all rides");
         setFilteredRides(allMatchingRides);
       }
     }
@@ -81,17 +72,14 @@ const FindRideForm: React.FC = () => {
 
   // Event handlers - moved outside useEffect and memoized
   const handleNewRide = useCallback(() => {
-    console.log("New ride created event received");
     refreshMatchingRides();
   }, [refreshMatchingRides]);
 
   const handleUpdateRide = useCallback(() => {
-    console.log("Ride update event received");
     refreshMatchingRides();
   }, [refreshMatchingRides]);
 
   const handleSyncEvent = useCallback(() => {
-    console.log("Sync event received");
     // Wait a moment to allow the database to update before refreshing
     setTimeout(() => refreshMatchingRides(), 300);
   }, [refreshMatchingRides]);
@@ -102,7 +90,6 @@ const FindRideForm: React.FC = () => {
 
   // Always subscribe to ride updates regardless of search state
   useEffect(() => {
-    console.log("Setting up real-time ride update subscriptions");
 
     // Subscribe to all ride events that might affect our results
     const unsubscribeNew = subscribeToEvent(

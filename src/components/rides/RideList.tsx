@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { RideRequest } from "../../types";
 import RideCard from "./RideCard";
 import { useRide } from "../../contexts/RideContext";
@@ -41,16 +41,6 @@ const RideList: React.FC<RideListProps> = ({
   const sortedRides = [...rides].sort((a, b) => {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
-
-  // Track rides in state just for logging
-  useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.log(
-        "RideList: Current ride IDs:",
-        sortedRides.map((r) => r.id).join(", ")
-      );
-    }
-  }, [sortedRides]);
 
   const handleJoinClick = async (rideId: string) => {
     // Sync ride status before joining

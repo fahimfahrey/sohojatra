@@ -85,7 +85,6 @@ export const registerNotificationServiceWorker =
           "/serwist/sw.js",
           { scope: "/" },
         );
-        console.log("Notification Service Worker registered:", registration);
         return registration;
       } catch (error) {
         console.error("Service Worker registration failed:", error);
