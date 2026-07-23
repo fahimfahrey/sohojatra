@@ -34,6 +34,17 @@ async function getClientIp(): Promise<string> {
   );
 }
 
+async function getSiteUrl(): Promise<string> {
+  const headersList = await headers();
+  const forwardedHost = headersList.get("x-forwarded-host");
+  const host = forwardedHost ?? headersList.get("host");
+  if (host) {
+    const proto = headersList.get("x-forwarded-proto") ?? "https";
+    return `${proto}://${host}`;
+  }
+  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+}
+
 async function sha256Hex(input: string): Promise<string> {
   const bytes = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -159,7 +170,7 @@ export async function signUpAction(
     };
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const siteUrl = await getSiteUrl();
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -258,7 +269,7 @@ export async function requestPasswordResetAction(
     return { success: true };
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const siteUrl = await getSiteUrl();
   const redirectTo = `${siteUrl}/auth/callback?next=/reset-password`;
 
   const supabase = await createClient();
@@ -354,7 +365,7 @@ export async function confirmPasswordResetAction(
 }
 
 export async function signInWithGoogleAction(): Promise<void> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const siteUrl = await getSiteUrl();
   const redirectTo = `${siteUrl}/auth/callback?next=/dashboard`;
 
   const supabase = await createClient();
