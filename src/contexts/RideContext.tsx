@@ -52,9 +52,14 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { publishEvent, subscribeToEvent, connectionMode } = useAbly();
   const csrfToken = useCsrfToken();
+  // Key data fetching on the stable user id, not the user object. AuthContext
+  // hands out a fresh user object on every auth event (token refresh, tab
+  // focus, SIGNED_IN), which would otherwise re-run every effect below and
+  // re-trigger loads endlessly.
+  const userId = user?.id ?? null;
 
   const refreshUserRides = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setRides([]);
       setStale(false);
       setLoading(false);
@@ -65,9 +70,8 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       failureThreshold: 3,
       resetTimeoutMs: 30_000,
     });
-    const cacheKey = ridesCacheKey(user.id);
+    const cacheKey = ridesCacheKey(userId);
 
-    setLoading(true);
     try {
       const result = await breaker.execute(() => getUserRidesAction());
       if (result.success && result.data) {
@@ -87,30 +91,33 @@ export function RideProvider({ children }: { children: React.ReactNode }) {
       }
       setStale(true);
     } finally {
+      // `loading` gates the initial render only. Background refreshes
+      // (realtime sync, polling fallback, post-mutation) update data in place
+      // without blanking the dashboard, so we never flip it back to true.
       setLoading(false);
     }
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     refreshUserRides();
   }, [refreshUserRides]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     const unsub = subscribeToEvent(RIDES_CHANNEL, "sync", () => {
       refreshUserRides();
     });
     return unsub;
-  }, [user, subscribeToEvent, refreshUserRides]);
+  }, [userId, subscribeToEvent, refreshUserRides]);
 
   // Polling fallback when Ably is unavailable.
   useEffect(() => {
-    if (!user || connectionMode !== "polling") return;
+    if (!userId || connectionMode !== "polling") return;
     const id = setInterval(() => {
       refreshUserRides();
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [user, connectionMode, refreshUserRides]);
+  }, [userId, connectionMode, refreshUserRides]);
 
   const createRideRequest = async (
     startingPoint: Location,
